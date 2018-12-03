@@ -34,23 +34,27 @@ void init(void) // Initialize data structures of LEVEL-1:
         minode[i].refCount = 0;
 }
 
-void mount_root(void)  // mount root file system, establish / and CWDs
+void mount_root(char * name)  // mount root file system, establish / and CWDs
 {
-    /*
-      open device for RW (get a file descriptor as dev for the opened device)
-      read SUPER block to verify it's an EXT2 FS
-      record nblocks, ninodes as globals
+    dev = open(name, O_RDWR);
+    char buf[1024];
+    get_block(dev, 1, buf);
+    SUPER* s = (SUPER*)buf;
+    if(s->s_magic != 0xEF53)
+    {
+        printf("NOT AN EXT2 FILESYSTEM!\n");
+        exit(0);
+    }
+    nblocks = s->s_blocks_count;
+    ninodes = s->s_inodes_count;
 
-      read GD0; record bamp, imap, inodes_start as globals;
-      
-      root = iget(dev, 2);
-   
-      Let cwd of both P0 and P1 point at the root minode (refCount=3)
-          P0.cwd = iget(dev, 2); 
-          P1.cwd = iget(dev, 2);
+    get_block(dev, 2, buf);
+    GD * g = (GD*)buf;
+    bmap = g->bg_block_bitmap;
+    imap = g->bg_inode_bitmap;
+    inodes_start = gp->bg_inode_table;
 
-      Let running -> P0.
-      */
+    proc[0].cwd = proc[1].cwd = iget(dev, 2);
 }
 
 HOW TO chdir(char *pathname)
@@ -68,23 +72,56 @@ HOW TO chdir(char *pathname)
 
 void ls_dir(char * dirname)
 {
-      
-      ino = getino(dirname);
-      mip = iget(dev, ino); ===> mip points at dirname's minode
-                                                         INODE  
-                                                         other fields
-      Get INODE.i_block[0] into a buf[ ];
-      Step through each dir_entry (skip . and .. if you want)
-      For each dir_entry: you have its ino.
-      call ls_file(ino)
+    int ino = getino(dirname);
+    MINODE * mip = iget(dev, ino);
+    char buf[BLKSIZE];
+    for(int i = 0; i < 12; i++)
+    {
+        if(mip->inode.i_block[i] == 0)
+            break;
+        get_block(dev, mip->inode.i_block[i], buf);
+        char * cp = buf;
+        DIR * dp = (DIR*)buf;
+
+        while(cp < BLKSIZE + buf)
+        {
+            ls_file(dp->inode);
+            cp += dp->rec_len;
+            dp = (DIR*)cp;
+        }
+    }
+    iput(mip);
 }
 
 void ls_file(int ino)
 {
+    MINODE * mip = iget(dev, ino);
+    const char * t1 = "xwrxwrxwr-------";
+    const char * t2 = "----------------";
+    if(S_ISREG(mip->i_mode))
+        putchar('-')
+    else if(S_ISDIR(mip->i_mode))
+        putchar('d')
+    else if(S_ISLNK(mip->i_mode))
+        putchar('l');
+    for(int i = 8; i >= 0; i--)
+        putchar(((mip->i_mode) & (1 << i)) ? t1[i] : t2[i]);
+    printf(" %4d ", mip->i_links_count);
+    printf("%4d ", mip->i_gid);
+    printf("%4d ", mip->i_uid);
+    printf("%4d ", mip->i_size);
+    printf("%s ", ctime(mip->i_ctime))
 
-      mip = iget(dev, ino); ==> mip points at minode
-                                              INODE
-      Use INODE contents to ls it 
+    MINODE * parent = iget(dev, search(mip, ".."));
+    char buf[256];
+    findmyname(parent, ino, buf);
+    printf("%s", basename(buf));
+    iput(parent);
+
+    //TODO: IMPLEMENT PRINTING LINK
+    putchar('\n');
+    
+    iput(mip);   
 }
 
 
@@ -115,10 +152,15 @@ void quit()
 }
 
 /*
-int main(void)
+int main(int argc, char * argv[])
 {
+    if(argc < 2)
+    {
+        printf("Usage: fs360 diskname\n");
+        return 0;
+    }
     init();
-    mount_root();
+    mount_root(argv[1]);
 
     while(1){
         //  ask for a command line = "cmd [pathname]"
