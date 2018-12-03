@@ -24,7 +24,7 @@ DIR   *dp;
 #define NPROC       2
 
 typedef struct minode{
-  INODE INODE;
+  INODE inode;
   int dev, ino;
   int refCount;
   int dirty;
