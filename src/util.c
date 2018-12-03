@@ -32,10 +32,18 @@ extern char line[256], cmd[32], pathname[256];
 
 int get_block(int dev, int blk, char *buf)
 {
+    lseek(dev, blk*BLKSIZE, 0);
+    int n = read(dev, buf, BLKSIZE);
+    if (n<0) return 0;
+    return 1;
 }   
 
 int put_block(int dev, int blk, char *buf)
 {
+    lseek(dev, blk*BLKSIZE, 0);
+    if(write(dev, buf, BLKSIZE) != BLKSIZE)
+        return 0;
+    return 1;
 }   
 
 int tokenize(char *pathname)
