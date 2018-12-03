@@ -61,44 +61,44 @@ int tokenize(char *pathname)
 
 MINODE *iget(int dev, int ino)
 {
-  // return minode pointer to loaded INODE
-  (1). Search minode[ ] for an existing entry (refCount > 0) with 
-       the needed (dev, ino):
-       if found: inc its refCount by 1;
-                 return pointer to this minode;
+    // return minode pointer to loaded INODE
+    for(int i = 0; i < NMINODE; i++)
+        if(minode[i].refCount > 0 && minode[i].dev == dev && minode[i].ino == ino)
+        {
+            minode[i].refCount++;
+            return (minode + i);
+        }
 
-  (2). // needed entry not in memory:
-       find a FREE minode (refCount = 0); Let mip-> to this minode;
-       set its refCount = 1;
-       set its dev, ino
+    // needed entry not in memory:
+    int i;
+    for(i = 0; i < NMINODE; i++)
+        if(minode[i].refCount == 0)
+        {
+            minode[i].refCount = 1;
+            minode[i].dev = dev;
+            minode[i].ino = ino;
+            break;
+        }
 
-  (3). load INODE of (dev, ino) into mip->INODE:
-       
-       // get INODE of ino a char buf[BLKSIZE]    
-       blk    = (ino-1) / 8 + inode_start;
-       offset = (ino-1) % 8;
-
-       printf("iget: ino=%d blk=%d offset=%d\n", ino, blk, offset);
-
-       get_block(dev, blk, buf);
-       ip = (INODE *)buf + offset;
-       mip->INODE = *ip;  // copy INODE to mp->INODE
-
-       return mip;
+    char buf[BLKSIZE];
+    int blk = (ino - 1) / 8 + inode_start, offset = (ino - 1) % 8;
+    get_block(dev, blk, buf);
+    minode[i].inode = *((INODE*)buf + offset);
+    return &(minode[i]);
 }
-
 
 int iput(MINODE *mip) // dispose a used minode by mip
 {
- mip->refCount--;
- 
- if (mip->refCount > 0) return;
- if (!mip->dirty)       return;
- 
- // Write YOUR CODE to write mip->INODE back to disk
-
-} 
-
+    mip->refCount--;
+    if (mip->refCount == 0 || mip->dirty)
+    {
+        char buf[BLKSIZE];
+        int blk = (mip->ino - 1) / 8 + inode_start, offset = (mip->ino - 1) % 8;
+        get_block(mip->dev, blk, buf);
+        *((INODE*)buf + offset) = mip->inode;
+        put_block(mip->dev, blk, buf);
+    }
+}
 
 // serach a DIRectory INODE for entry with a given name
 int search(MINODE *mip, char *name)
@@ -133,21 +133,49 @@ int search(MINODE *mip, char *name)
 
 
 // retrun inode number of pathname
-
 int getino(char *pathname)
 { 
-   // SAME as LAB6 program: just return the pathname's ino;
+    MINODE * cur = (pathname[0] == '/') ? root : running->cwd;
+    // SAME as LAB6 program: just return the pathname's ino;
+    int size = tokenize(pathname);
+    int ino;
+    for(int i = 0; i < size; i++)
+    {
+        ino = search(cur, name[i]);
+        if(ino == 0)
+            return 0;
+        cur = iget(cur->dev, ino);
+    }
+    return ino;
 }
-
-
 
 // THESE two functions are for pwd(running->cwd), which prints the absolute
 // pathname of CWD. 
-
 int findmyname(MINODE *parent, u32 myino, char *myname) 
 {
-   // parent -> at a DIR minode, find myname by myino
-   // get name string of myino: SAME as search except by myino;
-   // copy entry name (string) into myname[ ];
+    // parent -> at a DIR minode, find myname by myino
+    // get name string of myino: SAME as search except by myino;
+    // copy entry name (string) into myname[ ];
+    char dbuf[BLKSIZE], temp[256];
+    for(int i = 0; i < 12; i++)
+    {
+        if(parent->i_block[i] == 0)
+            break;
+        get_block(fd, ip->i_block[i], dbuf);
+        char * cp = dbuf;
+        DIR * dp = (DIR*)dbuf;
+
+        while(cp < dbuf + BLKSIZE)
+        {
+            if(dp->inode == myino)
+            {
+                strncpy(myname, dp->name, dp->name_len);
+                return 1;
+            }
+            cp += dp->rec_len;
+            dp = (DIR*)cp;
+        }
+    }
+    return 0;
 }
 
