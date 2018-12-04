@@ -521,12 +521,12 @@ int main(int argc, char * argv[])
     init();
     mount_root(argv[1]);
 
-
     while(1)
     {
         printf("\033[1;34mbdesh\033[0m $");
         fgets(line,256,stdin);
         line[strlen(line)-1] = '\0';
-        sscanf(line, "%s %s", cmd, pathname);
+        sscanf(line, "%s %s %s", cmd, pathname, pathname2);
+
     }
 }
