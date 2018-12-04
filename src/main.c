@@ -512,6 +512,41 @@ void readlink()
     iput(m);
 }
 
+void stat()
+{
+    int ino = getino(pathname);
+    if(!ino)
+    {
+        printf("File not found\n");
+        return;
+    }
+    MINODE * m = iget(dev, ino);
+    dbname(pathname);
+    printf("File: %s\n", bname);
+    printf("Size: %d\n", m->inode.i_size);
+    printf("Blocks: %d\n", m->inode.i_blocks);
+    char * type;
+    if(S_ISDIR(m->inode.i_mode))
+        type = "Dir";
+    else if(S_ISLNK(m->inode.i_mode))
+        type = "Link";
+    else
+        type = "Reg";
+    printf("Type: %s\n", type);
+    printf("Inode: %d\n", ino);
+    printf("Links: %d\n", m->inode.i_links_count);
+    printf("Access Time: %s\n", ctime(m->inode.i_atime));
+    printf("Modify Time: %s\n", ctime(m->inode.i_mtime));
+    printf("Change Time: %s\n", ctime(m->inode.i_ctime));
+    printf("Device: %d\n", m->dev);
+    printf("UID: %d\n", m->inode.i_uid);
+    printf("GID: %d\n", m->inode.i_gid);
+
+    //TODO: ACCESS TIME
+
+    iput(m);
+}
+
 int main(int argc, char * argv[])
 {
     if (argc < 2)
@@ -530,3 +565,4 @@ int main(int argc, char * argv[])
         sscanf(line, "%s %s", cmd, pathname);
     }
 }
+
