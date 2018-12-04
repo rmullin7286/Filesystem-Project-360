@@ -60,7 +60,7 @@ void mount_root(char * name)  // mount root file system, establish / and CWDs
 //HOW TO chdir(char *pathname)
 void chdir(char *pathname)
    {
-      if (no pathname)
+      if (strlen(pathname) == 0)
          cd to root;
       else
          cd to pathname by
