@@ -24,7 +24,7 @@ int  n;
 
 int  fd, dev;
 int  nblocks, ninodes, bmap, imap, inode_start;
-char line[256], cmd[32], pathname[256], pathname2[256];
+char line[256], cmd[32], pathname[256], pathname2[256], dname[256], bname[256];
 
 void init(void) // Initialize data structures of LEVEL-1:
 {
@@ -59,7 +59,7 @@ void mount_root(char * name)  // mount root file system, establish / and CWDs
 }
 
 //HOW TO chdir(char *pathname)
-void mychdir(char *pathname)
+void mychdir()
 {
     if (strlen(pathname) == 0 || strcmp(pathname, "/") == 0)
         running->cwd = root;
@@ -269,8 +269,14 @@ void quit()
     exit(0); 
 }
 
+int rmchild(MINODE * pip)
+{
+    // get help pls
+}
+
 int rmdir()
 {
+    dbname(pathname);
     int ino = getino(pathname);
     MINODE * mip = iget(dev, ino);
     if(proc->uid != mip->inode.uid && /*NOT SUPER USER*/)
@@ -301,26 +307,27 @@ int rmdir()
     {
         if (mip->INODE.i_block[i] == 0)
             continue;
-        
+        bdalloc(mip->dev,mip->inode.i_block[i])
     }
+    idealloc(mip->dev, mip->ino);
+    iput(mip);
+    
+    MINODE * pip = iget(dname);
+    rm_child(pip)
 }
 
-/*
+
 int main(void)
 {
     init();
     mount_root();
 
 
-
-    while(1){
-        printf("")
-        //  cmd=ls:
-        ls(pathname);
-        //  cmd=cd:
-        chdir(pathname);
-        //  cmd=pwd
-        pwd(running->cwd)
-        cmd=quit
-        quit();
+    while(1)
+    {
+        printf("\033[1;34mdash\033[0m $");
+        fgets(line,256,stdin);
+        line[strlen(line)-1] = '\0';
+        sscanf(line, "%s %s", command, pathname);
+    }
 }

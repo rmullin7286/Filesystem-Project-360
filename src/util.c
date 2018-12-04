@@ -27,7 +27,7 @@ extern char *name[64];
 extern int n;
 extern int fd, dev;
 extern int nblocks, ninodes, bmap, imap, inode_start;
-extern char line[256], cmd[32], pathname[256];
+extern char line[256], cmd[32], pathname[256], pathname2[256], dname[256], bname[256];
 
 int get_block(int dev, int blk, char *buf)
 {
@@ -199,6 +199,19 @@ int decFreeInodes(int dev)
     put_block(dev, 2, buf);
 }
 
+int incFreeInodes(int dev)
+{
+    char buf[BLKSIZE];
+    // increment free inodes count in SUPER and GD
+    get_block(dev, 1, buf);
+    ((SUPER *)buf)->s_free_inodes_count++;
+    put_block(dev, 1, buf);
+
+    get_block(dev, 2, buf);
+    ((GD *)buf)->bg_free_inodes_count++;
+    put_block(dev, 2, buf);
+}
+
 int ialloc(int dev)
 {
     char buf[BLKSIZE];
@@ -227,4 +240,42 @@ int balloc(int dev)
             return i + 1;
         }
     return 0;
+}
+
+void idalloc(int dev, int bno)
+{
+    char buf[BLKSIZE]
+    getblock(dev, imap, buf);
+    if(bno > ninodes)
+    {
+        printf("ERROR: inumber %d out of range.\n", ino);
+        return;
+    }
+    get_block(dev,imap,buf);
+    clr_bit(buf,bno-1);
+    put_block(dev,imap,buf);
+    incFreeInodes(dev);
+}
+
+void bdalloc(int dev, int bno)
+{
+    char buf[BLKSIZE]
+    if(bno > nblocks)
+    {
+        printf("ERROR: bnumber %d out of range.\n", ino);
+        return;
+    }
+    get_block(dev,bmap,buf);
+    clr_bit(buf,ino-1);
+    put_block(dev,bmap,buf);
+    incFreeInodes(dev);
+}
+
+void dbname(char *pathname)
+{
+    char temp[256];
+    strcpy(temp, pathname);
+    strcpy(dname, dirname(temp));
+    strcpy(temp, pathname);
+    strcpy(bname, basename(temp));
 }
