@@ -22,7 +22,7 @@
 extern MINODE minode[NMINODE];
 extern MINODE *root;
 extern PROC   proc[NPROC], *running;
-extern char gpath[128];
+extern char gpath[256];
 extern char *name[64];
 extern int n;
 extern int fd, dev;
@@ -245,7 +245,7 @@ int balloc(int dev)
 void idalloc(int dev, int ino)
 {
     char buf[BLKSIZE];
-    getblock(dev, imap, buf);
+    get_block(dev, imap, buf);
     if(ino > ninodes)
     {
         printf("ERROR: inumber %d out of range.\n", ino);

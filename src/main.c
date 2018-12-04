@@ -1,5 +1,5 @@
 /*********************************************************
-* COPYRIGHT xXRISENGAMERZXx LLC, 2018
+* COPYRIGHT xXRIS3NGAM3RZ420Xx LLC, 2018
 **********************************************************/
 #include <stdio.h>
 #include <stdlib.h>
@@ -129,19 +129,6 @@ void ls_file(int ino)
     iput(mip);   
 }
 
-void pwd(MINODE *wd)
-{
-    if(wd == root)
-    {
-        puts("/");
-        return;
-    }
-    rpwd(wd);
-    // if (wd == root) print "/"
-    // else
-    // rpwd(wd);
-}
-
 void rpwd(MINODE *wd)
 {
     char buf[256];
@@ -154,6 +141,19 @@ void rpwd(MINODE *wd)
     rpwd(pip);
     iput(pip);
     printf("/%s", buf);
+}
+
+void pwd(MINODE *wd)
+{
+    if(wd == root)
+    {
+        puts("/");
+        return;
+    }
+    rpwd(wd);
+    // if (wd == root) print "/"
+    // else
+    // rpwd(wd);
 }
 
 int ideal_length(int name_len)
@@ -193,7 +193,7 @@ void enter_name(MINODE * pip, int myino, char * myname)
             //put entry in existing block
             dp->rec_len = ideal_length(dp->name_len);
             dp = ((DIR*)cp + dp->rec_len);
-            *dp = (DIR){.inode = myino, .rec_len = BLKSIZE - (cp + dp->rec_len), .name_len = strlen(myname)};
+            *dp = (DIR){.inode = myino, .rec_len = BLKSIZE - (int)(cp + dp->rec_len), .name_len = strlen(myname)};
             strncpy(dp->name, myname, dp->name_len);
             put_block(pip->dev, pip->inode.i_block[i], buf);
             return;
@@ -203,8 +203,8 @@ void enter_name(MINODE * pip, int myino, char * myname)
 
 void make_entry(int dir)
 {
-    char * base = basename(pathname), * dir = dirname(pathname);
-    int parent = getino(dirname);
+    dbname(pathname);
+    int parent = getino(dname);
     if(!parent)
     {
         printf("ERROR: Specified path does not exist\n");
@@ -216,9 +216,9 @@ void make_entry(int dir)
         printf("ERROR: Specified path is not a directory\n");
         return;
     }
-    if(search(pip, base))
+    if(search(pip, bname))
     {
-        printf("ERROR: Entry %s already exists\n", base);
+        printf("ERROR: Entry %s already exists\n", bname);
         return;
     }
 
@@ -230,7 +230,7 @@ void make_entry(int dir)
     MINODE * mip = iget(dev, ino);
     INODE * ip = &(mip->inode);
     time_t t = time(0L);
-    *ip = (INODE){.i_mode = (dir ? 0x41ED : (S_IFREG | 0644)), .i_uid = running->uid, .i_gid = running->gid, .i_size = BLKSIZE, .i_links_count = (dir ? 2 : 1),
+    *ip = (INODE){.i_mode = (dir ? 0x41ED : (0x81A4/*S_IFREG?*/ | 0644)), .i_uid = running->uid, .i_gid = running->gid, .i_size = BLKSIZE, .i_links_count = (dir ? 2 : 1),
             .i_atime = t, .i_ctime = t, .i_mtime = t, .i_blocks = (dir ? 2 : 0), .i_block = {bno}};
     mip->dirty = 1;
 
@@ -242,7 +242,7 @@ void make_entry(int dir)
         put_block(dev, bno, buf);
     }
 
-    enter_name(pip, ino, base);
+    enter_name(pip, ino, bname);
 
     iput(mip);
     iput(pip);
@@ -250,12 +250,12 @@ void make_entry(int dir)
 
 void makedir()
 {
-    make_file(1);
+    make_entry(1);
 }
 
 void create_file()
 {
-    make_file(0);
+    make_entry(0);
 }
 
 void quit()
@@ -270,63 +270,155 @@ void quit()
     exit(0); 
 }
 
-int rmchild(MINODE * pip)
+int rmchild(MINODE * pip, char * name)
 {
-    // get help pls
+    char *cp, buf[BLKSIZE];
+    DIR *dp, *prev;
+    int current;
+
+    for(int i = 0; i < 12; i++)
+    {
+        current = 0;
+        if(pip->inode.i_block[i] == 0)
+        {
+            printf("ERROR: %s does not exist.\n",bname);
+            return 1;
+        }
+        get_block(dev, pip->inode.i_block[i], buf);
+        cp = buf;
+        dp = (DIR *) buf;
+        prev = 0;
+        while (cp < buf + BLKSIZE)
+        {
+            if (strncmp(dp->name, name, dp->name_len) == 0)
+            {
+                int ideal = ideal_length(dp->name_len);
+                if(ideal != dp->rec_len) // Last entry since rec_len is just taking the rest of the block
+                {
+                    // Expand previous entry to take up deleted space.
+                    prev->rec_len += dp->rec_len;
+                }
+                else if(prev == NULL && cp + dp->rec_len == buf + 1024)// First and only entry because prev has not moved and dp takes the entire block
+                {
+                    char empty[BLKSIZE] = {0};
+                    put_block(dev, pip->inode.i_block, empty);
+                    bdealloc(dev, pip ->inode.i_block[i]); // Boof the entire block
+                    pip->inode.i_size -= BLKSIZE; // Decrement the block by the entire size of a block
+                    for(int j = i; j < 11; j++)
+                    {
+                        pip->inode.i_block[j] = pip->inode.i_block[j+1];
+                    }
+                    pip->inode.i_block[11] = 0;
+                }
+                else
+                {
+                    // Case where it is not (first and only) or last
+                    int removed = dp->rec_len;
+                    char *temp = buf;
+                    DIR *last = (DIR *)temp;
+
+                    while(temp + last->rec_len < buf + BLKSIZE) // Move to last entry in dir
+                    {
+                        temp += last->rec_len;
+                        last = (DIR *) temp;
+                    }
+                    last->rec_len = last->rec_len + removed;
+
+                    // Move everything after the removed entry to the left by the length of the entry
+                    memcpy(cp, cp + removed, BLKSIZE - current - removed + 1);
+                }
+                put_block(dev, pip->inode.i_block[i], buf);
+                pip->dirty = 1;
+                return 1;
+            }
+            cp += dp->rec_len; // move to next
+            current += dp->rec_len;
+            prev = dp;
+            dp = (DIR *) cp;
+        }
+        return 0;
+
+    }
+    
 }
 
 int rmdir()
 {
     dbname(pathname);
-    int ino = getino(pathname);
-    MINODE * mip = iget(dev, ino);
-    if(proc->uid != mip->inode.i_uid && /*NOT SUPER USER*/)
+    int ino = getino(pathname); //2. Get ino of pathname
+    MINODE * mip = iget(dev, ino); //3. Get ino
+    if(running->uid != mip->inode.i_uid && running->uid != 0)
     {
-        printf("You do not have permission to remove %s.\n", pathname);
+        printf("ERROR: You do not have permission to remove %s.\n", pathname);
+        iput(mip);
         return 1;
     }
     if(!S_ISDIR(mip->inode.i_mode))
     {
-        printf("%s is not a directory", pathname);
+        printf("ERROR: %s is not a directory", pathname);
+        iput(mip);
+        return 1;
     }
     if(mip->inode.i_links_count > 2)
     {
-        printf("Directory %s is not empty.\n", pathname);
+        printf("ERROR: Directory %s is not empty.\n", pathname);
+        iput(mip);
         return 1;
     }
-    for(int i = 2; i < 12; i++)
+    if(mip->inode.i_links_count == 2)
     {
-        if(mip->inode.i_block[i] != 0)
+        char buf[BLKSIZE], * cp;
+        DIR *dp;
+        get_block(dev, mip->inode.i_block[0],buf);
+        cp = buf;
+        dp = (DIR *) buf;
+        cp += dp->rec_len;
+        dp = (DIR *) cp; // Move to second entry ".."
+        if(dp->rec_len != 1012)
         {
-            printf("Directory %s is not empty.\n", pathname);
+            printf("ERROR: Directory %s is not empty.\n", pathname);
+            iput(mip);
             return 1;
         }
     }
-    //TODO: Check for busy
+    
+    if(mip->refCount > 0)
+    {
+        printf("ERROR: Directory %s is busy.\n", pathname);
+    }
 
-    for(int i = 0; i < 12)
+    for(int i = 0; i < 12; i++)
     {
         if (mip->inode.i_block[i] == 0)
             continue;
-        bdalloc(mip->dev,mip->inode.i_block[i])
+        bdalloc(mip->dev,mip->inode.i_block[i]);
     }
-    idealloc(mip->dev, mip->ino);
+    idalloc(mip->dev, mip->ino);
     iput(mip);
     
-    MINODE * pip = iget(dname);
-    rm_child(pip)
+    MINODE * pip = iget(dev, getino(dname));
+    rm_child(pip, bname);
+
+    pip->inode.i_links_count--;
+    pip->inode.i_atime = pip->inode.i_mtime = time(0L);
+    pip->dirty = 1;
+    iput(pip);
 }
 
 
-int main(void)
+int main(int argc, char * argv[])
 {
+    if (argc < 2)
+    {
+        printf("Usage: fs360 diskname");
+    }
     init();
-    mount_root();
+    mount_root(argv[1]);
 
 
     while(1)
     {
-        printf("\033[1;34mdash\033[0m $");
+        printf("\033[1;34mbdesh\033[0m $");
         fgets(line,256,stdin);
         line[strlen(line)-1] = '\0';
         sscanf(line, "%s %s", cmd, pathname);
