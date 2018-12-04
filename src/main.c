@@ -58,17 +58,22 @@ void mount_root(char * name)  // mount root file system, establish / and CWDs
 }
 
 //HOW TO chdir(char *pathname)
-void chdir(char *pathname)
-   {
-      if (strlen(pathname) == 0)
-         cd to root;
-      else
-         cd to pathname by
-      (1).  ino = getino(pathname);
-      (2).  mip = iget(dev, ino);
-      (3).  verify mip->INODE is a DIR
-      (4).  iput(running->cwd);
-      (5).  running->cwd = mip;
+void mychdir(char *pathname)
+{
+    if (strlen(pathname) == 0 || strcmp(pathname, "/") == 0)
+        running->cwd = root;
+    else
+    {
+        int ino = getino(pathname);
+        MINODE *mip = iget(dev, ino);
+        if(!(S_ISDIR(mip->inode.st_mode)))
+        {
+            printf("%s is not a directory", pathname);
+            return;
+        }
+        iput(running->cwd);
+        running->cwd = mip;
+    }
 }
 
 void ls_dir(char * dirname)
