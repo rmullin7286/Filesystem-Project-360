@@ -128,39 +128,52 @@ void ls_file(int ino)
 
 void pwd(MINODE *wd)
 {
-    if (wd == root) print "/"
-    else
+    if(wd == root)
+    {
+        puts("/");
+        return;
+    }
     rpwd(wd);
+    // if (wd == root) print "/"
+    // else
+    // rpwd(wd);
 }
 
 void rpwd(MINODE *wd)
 {
-    if (wd==root) return;
-    from i_block[0] of wd->INODE: get my_ino of . parent_ino of ..
-    pip = iget(dev, parent_ino);
-    from pip->INODE.i_block[0]: get my_name string as LOCAL
-
-    rpwd(pip);  // recursive call rpwd() with pip
-
-    print "/%s", my_name;
+    MINODE * pip;
+    char buf[256];
+    int parent_ino, my_ino;
+    if (wd==root)
+        return;
+    parent_ino = search(wd,"..");
+    my_ino = search(wd,".");
+    pip = iget(dev, search(wd, ".."));
+    findmyname(pip, my_ino, buf);
+    rpwd(pip);
+    print("/%s", buf);
 }
 
 void quit()
 {
-    iput() all minodes with (refCount > 0 && DIRTY);
+    // iput() all minodes with (refCount > 0 && DIRTY)
+    for (int i = 0; i < NMINODE; i++)
+    {
+        MINODE * mip = &minode[i];
+        if (mip->refCount > 0 && mip->dirty == 1)
+        {
+            mip->refCount = 1;
+            iput(mip);
+        }
+    }
     exit(0); 
 }
 
 /*
-int main(int argc, char * argv[])
+int main(void)
 {
-    if(argc < 2)
-    {
-        printf("Usage: fs360 diskname\n");
-        return 0;
-    }
     init();
-    mount_root(argv[1]);
+    mount_root();
 
     while(1){
         //  ask for a command line = "cmd [pathname]"
