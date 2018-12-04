@@ -175,6 +175,42 @@ void quit()
     exit(0); 
 }
 
+int rmdir()
+{
+    int ino = getino(pathname);
+    MINODE * mip = iget(dev, ino);
+    if(proc->uid != mip->inode.uid && /*NOT SUPER USER*/)
+    {
+        printf("You do not have permission to remove %s.\n", pathname);
+        return 1;
+    }
+    if(!S_ISDIR(mip->inode.st_mode))
+    {
+        printf("%s is not a directory", pathname);
+    }
+    if(mip->inode.i_links_count > 2)
+    {
+        printf("Directory %s is not empty.\n" pathname);
+        return 1;
+    }
+    for(int i = 2; i < 12; i++)
+    {
+        if(mip->inode.i_block[i] != 0)
+        {
+            printf("Directory %s is not empty.\n" pathname);
+            return 1;
+        }
+    }
+    //TODO: Check for busy
+
+    for(int i = 0; i < 12)
+    {
+        if (mip->INODE.i_block[i] == 0)
+            continue;
+        
+    }
+}
+
 /*
 int main(void)
 {
