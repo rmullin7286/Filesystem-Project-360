@@ -29,7 +29,6 @@ extern int fd, dev;
 extern int nblocks, ninodes, bmap, imap, inode_start;
 extern char line[256], cmd[32], pathname[256];
 
-
 int get_block(int dev, int blk, char *buf)
 {
     lseek(dev, blk*BLKSIZE, 0);
@@ -179,3 +178,59 @@ int findmyname(MINODE *parent, u32 myino, char *myname)
     return 0;
 }
 
+int tst_bit(char * buf, int bit)
+{
+    return buf[i] & ((bit/8) << (bit%8));
+}
+
+void set_bit(char * buf, int bit)
+{
+    buf[bit/8] |= (1 << (bit%8));
+}
+
+void clr_bit(char * buf, int bit)
+{
+    buf[bit/8] &= ~(1 << (bit%8));
+}
+
+int decFreeInodes(int dev)
+{
+    char buf[BLKSIZE];
+    get_block(dev, 1, buf);
+    ((SUPER*)buf)->s_free_inodes_count--;
+    put_block(dev, 1, buf);
+
+    get_block(dev, 2, buf);
+    ((GD*)buf)->bg_free_inodes_count--;
+    put_block(dev, 2, buf);
+}
+
+int ialloc(int dev)
+{
+    char buf[BLKSIZE];
+    get_block(dev, imap, buf);
+    for(int i = 0; i < ninodes; i++)
+        if(tst_bit(buf, i) == 0)
+        {
+            set_bit(buf, i);
+            decFreeInodes(dev);
+            put_block(dev, imap, buf);
+            return i + 1;
+        }
+    return 0;
+}
+
+int balloc(int dev)
+{
+    char buf[BLKSIZE];
+    get_block(dev, bmap, buf);
+    for(int i = 0; i < nblocks; i++)
+        if(tst_bit(buf, i) == 0)
+        {
+            set_bit(buf, i);
+            decFreeInodes(dev);
+            put_block(dev, bmap, buf);
+            return i + 1;
+        }
+    return 0;
+}

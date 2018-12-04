@@ -1,3 +1,6 @@
+/*********************************************************
+* COPYRIGHT xXRISENGAMERZXx LLC, 2018
+**********************************************************/
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -126,11 +129,9 @@ void ls_file(int ino)
 
     //TODO: IMPLEMENT PRINTING LINK
     putchar('\n');
-    
+
     iput(mip);   
 }
-
-
 
 void pwd(MINODE *wd)
 {
@@ -158,6 +159,108 @@ void rpwd(MINODE *wd)
     findmyname(pip, my_ino, buf);
     rpwd(pip);
     print("/%s", buf);
+}
+
+int ideal_length(int name_len)
+{
+    return 4 * ((11 + name_len) / 4);
+}
+
+void enter_name(MINODE * pip, int myino, char * myname)
+{
+    int need_len = ideal_length(strlen(myname));
+    for(int i = 0; i < 12; i++)
+    {
+        char buf[BLKSIZE];
+        DIR * dp = (DIR*)buf;
+        char * cp = buf;
+
+        if(pip->inode.i_block[i] == 0)
+        {
+            //allocate a new block
+            pip->inode.i_block[i] = balloc(dev);
+            get_block(pip->dev, pip->inode.i_block[i], buf);
+            *dp = (DIR){.inode = myino, .rec_len = BLKSIZE, .name_len = strlen(myname)};
+            strncpy(dp->name, myname, dp->name_len);
+        }
+ 
+        get_block(pip->dev, pip->inode.i_block[i], buf);
+
+        //get to the last entry in the block
+        while(cp + dp->rec_len < buf + BLKSIZE)
+        {
+            cp += dp->rec_len;
+            dp = (DIR*)cp;
+        }
+
+        if(dp->rec_len - ideal_length(dp->name_len) >= need_len)
+        {
+            //put entry in existing block
+            dp->rec_len = ideal_length(dp->name_len);
+            dp = ((DIR*)cp + dp->rec_len);
+            *dp = (DIR){.inode = myino, .rec_len = BLKSIZE - (cp + dp->rec_len), .name_len = strlen(myname)};
+            strncpy(dp->name, myname, dp->name_len);
+            put_block(pip->dev, pip->i_block[i], buf);
+            return;
+        }
+    }
+}
+
+void make_entry(int dir)
+{
+    char * base = basename(pathname), * dir = dirname(pathname);
+    int parent = getino(dirname);
+    if(!parent)
+    {
+        printf("ERROR: Specified path does not exist\n");
+        return;
+    }
+    MINODE * pip = iget(dev, parent);
+    if(!S_ISDIR(pip->i_mode))
+    {
+        printf("ERROR: Specified path is not a directory\n");
+        return;
+    }
+    if(search(pip, base))
+    {
+        printf("ERROR: Entry %s already exists\n", base);
+        return;
+    }
+
+    if(dir)
+        pip->i_links_count++;
+    
+    int ino = ialloc(dev), bno = dir ? balloc(dev) : 0;
+
+    MINODE * mip = iget(dev, ino);
+    INODE * ip = &(mip->inode);
+    time_t t = time(0L);
+    *ip = (INODE){.i_mode = (dir ? 0x41ED : (S_IFREG | 0644)), .i_uid = running->uid, .i_gid = running->gid, .i_size = BLKSIZE, .i_links_count = (dir ? 2 : 1),
+            .i_atime = t, .i_ctime = t, .i_mtime = t, .i_blocks = (dir ? 2 : 0), .i_block = {bno}};
+    mip->dirty = 1;
+
+    if(dir)
+    {
+        char buf[BLKSIZE] = {0};
+        *((DIR*)buf) = (DIR){.inode = ino, .rec_len = 12, .name_len = 1, .name = "."};
+        *((DIR*)buf +  12) = (DIR){.inode = ino, .rec_len = 12, .name_len = 2, .name = ".."};
+        put_block(dev, bno, buf);
+    }
+
+    enter_name(pip, ino, base);
+
+    iput(mip);
+    iput(pip);
+}
+
+void makedir()
+{
+    make_file(1);
+}
+
+void create_file()
+{
+    make_file(0);
 }
 
 void quit()
@@ -217,8 +320,10 @@ int main(void)
     init();
     mount_root();
 
+
+
     while(1){
-        //  ask for a command line = "cmd [pathname]"
+        printf("")
         //  cmd=ls:
         ls(pathname);
         //  cmd=cd:
@@ -228,5 +333,3 @@ int main(void)
         cmd=quit
         quit();
 }
-*/
-
