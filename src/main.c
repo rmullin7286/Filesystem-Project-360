@@ -436,6 +436,9 @@ void link()
     }
     enter_name(dirnode, ino, base);
 
+    source->i_links_count++;
+    source->dirty = 1;
+
     iput(source);
     iput(dirnode);
 }
@@ -458,7 +461,11 @@ void unlink()
     {
         truncate(m);
         idalloc(m->dev, m->ino);
-    };
+    }
+    else
+    {
+        m->dirty = 1;
+    }
 
     dbname(pathname);
     MINODE * parent = iget(dev, getino(dname));
