@@ -60,17 +60,23 @@ void mount_root(char * name)  // mount root file system, establish / and CWDs
     proc[0].cwd = proc[1].cwd = iget(dev, 2);
 }
 
-HOW TO chdir(char *pathname)
-   {
-      if (no pathname)
-         cd to root;
-      else
-         cd to pathname by
-      (1).  ino = getino(pathname);
-      (2).  mip = iget(dev, ino);
-      (3).  verify mip->INODE is a DIR
-      (4).  iput(running->cwd);
-      (5).  running->cwd = mip;
+//HOW TO chdir(char *pathname)
+void mychdir(char *pathname)
+{
+    if (strlen(pathname) == 0 || strcmp(pathname, "/") == 0)
+        running->cwd = root;
+    else
+    {
+        int ino = getino(pathname);
+        MINODE *mip = iget(dev, ino);
+        if(!(S_ISDIR(mip->inode.st_mode)))
+        {
+            printf("%s is not a directory", pathname);
+            return;
+        }
+        iput(running->cwd);
+        running->cwd = mip;
+    }
 }
 
 void ls_dir(char * dirname)
@@ -129,21 +135,30 @@ void ls_file(int ino)
 
 void pwd(MINODE *wd)
 {
-    if (wd == root) print "/"
-    else
+    if(wd == root)
+    {
+        puts("/");
+        return;
+    }
     rpwd(wd);
+    // if (wd == root) print "/"
+    // else
+    // rpwd(wd);
 }
 
 void rpwd(MINODE *wd)
 {
-    if (wd==root) return;
-    from i_block[0] of wd->INODE: get my_ino of . parent_ino of ..
-    pip = iget(dev, parent_ino);
-    from pip->INODE.i_block[0]: get my_name string as LOCAL
-
-    rpwd(pip);  // recursive call rpwd() with pip
-
-    print "/%s", my_name;
+    MINODE * pip;
+    char buf[256];
+    int parent_ino, my_ino;
+    if (wd==root)
+        return;
+    parent_ino = search(wd,"..");
+    my_ino = search(wd,".");
+    pip = iget(dev, search(wd, ".."));
+    findmyname(pip, my_ino, buf);
+    rpwd(pip);
+    print("/%s", buf);
 }
 
 int ideal_length(int name_len)
@@ -250,20 +265,24 @@ void create_file()
 
 void quit()
 {
-    iput() all minodes with (refCount > 0 && DIRTY);
+    // iput() all minodes with (refCount > 0 && DIRTY)
+    for (int i = 0; i < NMINODE; i++)
+    {
+        MINODE * mip = &minode[i];
+        if (mip->refCount > 0 && mip->dirty == 1)
+        {
+            mip->refCount = 1;
+            iput(mip);
+        }
+    }
     exit(0); 
 }
 
 
 int main(int argc, char * argv[])
 {
-    if(argc < 2)
-    {
-        printf("Usage: fs360 diskname\n");
-        return 0;
-    }
     init();
-    mount_root(argv[1]);
+    mount_root();
 
 
 
