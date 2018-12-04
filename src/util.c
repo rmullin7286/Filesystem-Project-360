@@ -97,10 +97,8 @@ int search(MINODE *mip, char *name)
   char dbuf[BLKSIZE], temp[256];
   DIR *dp;
   char * cp;
-  for (int i = 0; i < 12; i++)
+  for (int i = 0; i < 12 && mip->inode.i_block[i]; i++)
   {
-    if (mip->inode.i_block[i] == 0)
-      break;
     get_block(fd, mip->inode.i_block[i], dbuf);
     dp = (DIR*) dbuf;
     cp = dbuf;
@@ -150,10 +148,8 @@ int findmyname(MINODE *parent, u32 myino, char *myname)
     // get name string of myino: SAME as search except by myino;
     // copy entry name (string) into myname[ ];
     char dbuf[BLKSIZE], temp[256];
-    for(int i = 0; i < 12; i++)
+    for(int i = 0; i < 12 && parent->inode.i_block[i]; i++)
     {
-        if(parent->inode.i_block[i] == 0)
-            break;
         get_block(fd, parent->inode.i_block[i], dbuf);
         char * cp = dbuf;
         DIR * dp = (DIR*)dbuf;
@@ -269,6 +265,14 @@ void bdalloc(int dev, int bno)
     clr_bit(buf,bno-1);
     put_block(dev,bmap,buf);
     incFreeInodes(dev);
+}
+
+void truncate(MINODE * mip)
+{
+    for(int i = 0; i < 12 && mip->inode.i_block[i]; i++)
+        bdalloc(mip->dev, mip->inode.i_block[i]);
+
+    //TODO: indirect blocks
 }
 
 void dbname(char *pathname)

@@ -83,10 +83,8 @@ void ls_dir(char * dirname)
     int ino = getino(dirname);
     MINODE * mip = iget(dev, ino);
     char buf[BLKSIZE];
-    for(int i = 0; i < 12; i++)
+    for(int i = 0; i < 12 && mip->inode.i_block[i]; i++)
     {
-        if(mip->inode.i_block[i] == 0)
-            break;
         get_block(dev, mip->inode.i_block[i], buf);
         char * cp = buf;
         DIR * dp = (DIR*)buf;
@@ -121,10 +119,10 @@ void ls_file(int ino)
     MINODE * parent = iget(dev, search(mip, ".."));
     char buf[256];
     findmyname(parent, ino, buf);
-    printf("%s\n", basename(buf));
+    printf("%s", basename(buf));
     iput(parent);
 
-    //TODO: IMPLEMENT PRINTING LINK
+    printf("%s\n" (S_ISLNK(m->inode.i_mode)) ? (char*)(m->inode.i_block) : "\0");
 
     iput(mip);   
 }
@@ -143,14 +141,14 @@ void rpwd(MINODE *wd)
     printf("/%s", buf);
 }
 
-void pwd(MINODE *wd)
+void pwd()
 {
-    if(wd == root)
+    if(running->cwd == root)
     {
         puts("/");
         return;
     }
-    rpwd(wd);
+    rpwd(running->cwd);
     // if (wd == root) print "/"
     // else
     // rpwd(wd);
@@ -201,9 +199,9 @@ void enter_name(MINODE * pip, int myino, char * myname)
     }
 }
 
-void make_entry(int dir)
+int make_entry(int dir, char * name)
 {
-    dbname(pathname);
+    dbname(name);
     int parent = getino(dname);
     if(!parent)
     {
@@ -230,7 +228,7 @@ void make_entry(int dir)
     MINODE * mip = iget(dev, ino);
     INODE * ip = &(mip->inode);
     time_t t = time(0L);
-    *ip = (INODE){.i_mode = (dir ? 0x41ED : (0x81A4/*S_IFREG?*/ | 0644)), .i_uid = running->uid, .i_gid = running->gid, .i_size = BLKSIZE, .i_links_count = (dir ? 2 : 1),
+    *ip = (INODE){.i_mode = (dir ? 0x41ED : 0x81A4), .i_uid = running->uid, .i_gid = running->gid, .i_size = BLKSIZE, .i_links_count = (dir ? 2 : 1),
             .i_atime = t, .i_ctime = t, .i_mtime = t, .i_blocks = (dir ? 2 : 0), .i_block = {bno}};
     mip->dirty = 1;
 
@@ -246,16 +244,18 @@ void make_entry(int dir)
 
     iput(mip);
     iput(pip);
+
+    return ino;
 }
 
 void makedir()
 {
-    make_entry(1);
+    make_entry(1, pathname);
 }
 
 void create_file()
 {
-    make_entry(0);
+    make_entry(0, pathname);
 }
 
 void quit()
@@ -276,14 +276,10 @@ int rmchild(MINODE * pip, char * name)
     DIR *dp, *prev;
     int current;
 
-    for(int i = 0; i < 12; i++)
+    for(int i = 0; i < 12 && pip->inode.i_block[i]; i++)
     {
         current = 0;
-        if(pip->inode.i_block[i] == 0)
-        {
-            printf("ERROR: %s does not exist.\n",bname);
-            return 1;
-        }
+
         get_block(dev, pip->inode.i_block[i], buf);
         cp = buf;
         dp = (DIR *) buf;
@@ -337,9 +333,10 @@ int rmchild(MINODE * pip, char * name)
             dp = (DIR *) cp;
         }
         return 0;
-
     }
-    
+
+    printf("ERROR: %s does not exist.\n",bname);
+    return 1;
 }
 
 int rmdir()
@@ -405,6 +402,108 @@ int rmdir()
     iput(pip);
 }
 
+void link()
+{
+    int ino = getino(pathname);
+    if(!ino)
+    {
+        printf("Source file does not exist\n");
+        return;
+    }
+    MINODE * source = iget(dev, ino);
+    if(S_ISDIR(source->inode.i_mode))
+    {
+        printf("Link to directory not allowed\n");
+        return;
+    }
+    char * dir = dirname(pathname2), * base = basename(pathname2);
+    int dirino = getino(dir);
+    if(!dirino)
+    {
+        printf("Destination directory does not exist\n");
+        return;
+    }
+    MINODE * dirnode = iget(dev, dirino);
+    if(!S_ISDIR(dirnode->inode.i_mode))
+    {
+        printf("Destination is not a directory\n");
+        return;
+    }
+    if(search(dirnode, base))
+    {
+        printf("Destination file already exists\n");
+        return;
+    }
+    enter_name(dirnode, ino, base);
+
+    iput(source);
+    iput(dirnode);
+}
+
+void unlink()
+{
+    int ino = getino(pathname);
+    if(!ino)
+    {
+        printf("Could not find specified path\n");
+        return;
+    }
+    MINODE * m = iget(dev, ino);
+    if(S_ISDIR(m->inode.i_mode))
+    {
+        printf("Specified path is a directory\n");
+        return;
+    }
+    if(--(m->inode.i_links_count) == 0)
+    {
+        truncate(m);
+        idalloc(m->dev, m->ino);
+    };
+
+    dbname(pathname);
+    MINODE * parent = iget(dev, getino(dname));
+    rm_child(parent, bname);
+
+    iput(parent);
+    iput(m);
+}
+
+void symlink()
+{
+    char * pathname_dup = strdup(pathname);
+    if(!getino(pathname_dup))
+    {
+        free(pathname_dup);
+        printf("Specified source path does not exist\n");
+        return;
+    }
+    free(pathname_dup);
+    int ino = make_entry(0, pathname2);
+    MINODE * m = iget(dev, ino);
+    m->i_mode = 0xA1A4;
+    strcpy((char*)(m->i_block), pathname);
+
+    iput(m);
+}
+
+void readlink()
+{
+    int ino = getino(pathname);
+    if(!ino)
+    {
+        printf("Specified path does not exist\n");
+        return;
+    }
+    MINODE * m = iget(dev, ino);
+    if(!S_ISLNK(m->inode.i_mode))
+    {
+        printf("Specified path is not a link file\n");
+        return;
+    }
+    printf("%s\n" (char*)(m->inode.i_block));
+
+    iput(m);
+}
 
 int main(int argc, char * argv[])
 {
