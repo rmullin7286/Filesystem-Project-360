@@ -24,15 +24,13 @@ int  n;
 
 int  fd, dev;
 int  nblocks, ninodes, bmap, imap, inode_start;
-char line[256], cmd[32], pathname[256];
+char line[256], cmd[32], pathname[256], pathname2[256];
 
 void init(void) // Initialize data structures of LEVEL-1:
 {
     proc[0].uid = 0;
     proc[1].uid = 1;
-    proc[0].cwd = proc[1].cwd = root;
     running = proc;
-    root = NULL;
     for(int i = 0; i < NMINODE; i++)
         minode[i].refCount = 0;
 }
@@ -115,20 +113,17 @@ void ls_file(int ino)
         putchar('l');
     for(int i = 8; i >= 0; i--)
         putchar(((mip->i_mode) & (1 << i)) ? t1[i] : t2[i]);
-    printf(" %4d ", mip->i_links_count);
-    printf("%4d ", mip->i_gid);
-    printf("%4d ", mip->i_uid);
-    printf("%4d ", mip->i_size);
-    printf("%s ", ctime(mip->i_ctime))
+
+    printf(" %4d %4d %4d %4d %s ", mip->i_links_count, mip->i_gid, mip->i_uid, mip->i_size,
+            ctime(mip->i_ctime));
 
     MINODE * parent = iget(dev, search(mip, ".."));
     char buf[256];
     findmyname(parent, ino, buf);
-    printf("%s", basename(buf));
+    printf("%s\n", basename(buf));
     iput(parent);
 
     //TODO: IMPLEMENT PRINTING LINK
-    putchar('\n');
 
     iput(mip);   
 }
@@ -148,17 +143,16 @@ void pwd(MINODE *wd)
 
 void rpwd(MINODE *wd)
 {
-    MINODE * pip;
     char buf[256];
-    int parent_ino, my_ino;
     if (wd==root)
         return;
-    parent_ino = search(wd,"..");
-    my_ino = search(wd,".");
-    pip = iget(dev, search(wd, ".."));
+    int parent_ino = search(wd,"..");
+    int my_ino = search(wd,".");
+    MINODE * pip = iget(dev, search(wd, ".."));
     findmyname(pip, my_ino, buf);
     rpwd(pip);
-    print("/%s", buf);
+    iput(pip);
+    printf("/%s", buf);
 }
 
 int ideal_length(int name_len)
@@ -267,14 +261,11 @@ void quit()
 {
     // iput() all minodes with (refCount > 0 && DIRTY)
     for (int i = 0; i < NMINODE; i++)
-    {
-        MINODE * mip = &minode[i];
-        if (mip->refCount > 0 && mip->dirty == 1)
+        if (minode[i].refCount > 0 && minode[i].dirty == 1)
         {
-            mip->refCount = 1;
-            iput(mip);
+            minode[i].refCount = 1;
+            iput(minode + i);
         }
-    }
     exit(0); 
 }
 

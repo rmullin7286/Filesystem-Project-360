@@ -32,29 +32,24 @@ extern char line[256], cmd[32], pathname[256];
 int get_block(int dev, int blk, char *buf)
 {
     lseek(dev, blk*BLKSIZE, 0);
-    int n = read(dev, buf, BLKSIZE);
-    if (n<0) return 0;
-    return 1;
+    return (read(dev, buf, BLKSIZE) < 0) ? 0 : 1;
 }   
 
 int put_block(int dev, int blk, char *buf)
 {
     lseek(dev, blk*BLKSIZE, 0);
-    if(write(dev, buf, BLKSIZE) != BLKSIZE)
-        return 0;
-    return 1;
+    return (write(dev, buf, BLKSIZE) != BLKSIZE) ? 0 : 1;
 }   
 
 int tokenize(char *pathname)
 {
-  // tokenize pathname into n components: name[0] to name[n-1];
+    // tokenize pathname into n components: name[0] to name[n-1];
     char * temp;
-    int i = 0;
-    while(temp = strtok(pathname, "/") && i < 64)
-    {
-      name[i] = temp;
-      i++;
-    }
+    int i;
+    temp = strtok(pathname, "/");
+    do
+        name[i++] = temp;
+    while(temp = strtok(NULL, "/") && i < 64);
     return i;
 }
 
@@ -73,9 +68,7 @@ MINODE *iget(int dev, int ino)
     for(i = 0; i < NMINODE; i++)
         if(minode[i].refCount == 0)
         {
-            minode[i].refCount = 1;
-            minode[i].dev = dev;
-            minode[i].ino = ino;
+            minode[i] = (MINODE){.refCount = 1, .dev = dev, .ino = ino};
             break;
         }
 
@@ -83,13 +76,12 @@ MINODE *iget(int dev, int ino)
     int blk = (ino - 1) / 8 + inode_start, offset = (ino - 1) % 8;
     get_block(dev, blk, buf);
     minode[i].inode = *((INODE*)buf + offset);
-    return &(minode[i]);
+    return minode + i;
 }
 
 int iput(MINODE *mip) // dispose a used minode by mip
 {
-    mip->refCount--;
-    if (mip->refCount == 0 || mip->dirty)
+    if (--(mip->refCount) == 0 || mip->dirty)
     {
         char buf[BLKSIZE];
         int blk = (mip->ino - 1) / 8 + inode_start, offset = (mip->ino - 1) % 8;
@@ -143,8 +135,10 @@ int getino(char *pathname)
         ino = search(cur, name[i]);
         if(ino == 0)
             return 0;
+        iput(cur);
         cur = iget(cur->dev, ino);
     }
+    iput(cur);
     return ino;
 }
 
