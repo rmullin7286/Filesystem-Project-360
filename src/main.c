@@ -57,7 +57,8 @@ void mount_root(char * name)  // mount root file system, establish / and CWDs
     proc[0].cwd = proc[1].cwd = iget(dev, 2);
 }
 
-HOW TO chdir(char *pathname)
+//HOW TO chdir(char *pathname)
+void chdir(char *pathname)
    {
       if (no pathname)
          cd to root;
