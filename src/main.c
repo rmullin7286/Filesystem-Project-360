@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <time.h>
 
 #include <ext2fs/ext2_fs.h>
 #include <string.h>
@@ -53,7 +54,7 @@ void mount_root(char * name)  // mount root file system, establish / and CWDs
     GD * g = (GD*)buf;
     bmap = g->bg_block_bitmap;
     imap = g->bg_inode_bitmap;
-    inodes_start = gp->bg_inode_table;
+    inode_start = g->bg_inode_table;
 
     proc[0].cwd = proc[1].cwd = iget(dev, 2);
 }
@@ -67,7 +68,7 @@ void mychdir()
     {
         int ino = getino(pathname);
         MINODE *mip = iget(dev, ino);
-        if(!(S_ISDIR(mip->inode.st_mode)))
+        if(!(S_ISDIR(mip->inode.i_mode)))
         {
             printf("%s is not a directory", pathname);
             return;
@@ -105,17 +106,17 @@ void ls_file(int ino)
     MINODE * mip = iget(dev, ino);
     const char * t1 = "xwrxwrxwr-------";
     const char * t2 = "----------------";
-    if(S_ISREG(mip->i_mode))
-        putchar('-')
-    else if(S_ISDIR(mip->i_mode))
-        putchar('d')
-    else if(S_ISLNK(mip->i_mode))
+    if(S_ISREG(mip->inode.i_mode))
+        putchar('-');
+    else if(S_ISDIR(mip->inode.i_mode))
+        putchar('d');
+    else if(S_ISLNK(mip->inode.i_mode))
         putchar('l');
     for(int i = 8; i >= 0; i--)
-        putchar(((mip->i_mode) & (1 << i)) ? t1[i] : t2[i]);
+        putchar(((mip->inode.i_mode) & (1 << i)) ? t1[i] : t2[i]);
 
-    printf(" %4d %4d %4d %4d %s ", mip->i_links_count, mip->i_gid, mip->i_uid, mip->i_size,
-            ctime(mip->i_ctime));
+    printf(" %4d %4d %4d %4d %s ", mip->inode.i_links_count, mip->inode.i_gid, mip->inode.i_uid, mip->inode.i_size,
+            ctime(mip->inode.i_ctime));
 
     MINODE * parent = iget(dev, search(mip, ".."));
     char buf[256];
@@ -194,7 +195,7 @@ void enter_name(MINODE * pip, int myino, char * myname)
             dp = ((DIR*)cp + dp->rec_len);
             *dp = (DIR){.inode = myino, .rec_len = BLKSIZE - (cp + dp->rec_len), .name_len = strlen(myname)};
             strncpy(dp->name, myname, dp->name_len);
-            put_block(pip->dev, pip->i_block[i], buf);
+            put_block(pip->dev, pip->inode.i_block[i], buf);
             return;
         }
     }
@@ -210,7 +211,7 @@ void make_entry(int dir)
         return;
     }
     MINODE * pip = iget(dev, parent);
-    if(!S_ISDIR(pip->i_mode))
+    if(!S_ISDIR(pip->inode.i_mode))
     {
         printf("ERROR: Specified path is not a directory\n");
         return;
@@ -222,7 +223,7 @@ void make_entry(int dir)
     }
 
     if(dir)
-        pip->i_links_count++;
+        pip->inode.i_links_count++;
     
     int ino = ialloc(dev), bno = dir ? balloc(dev) : 0;
 
@@ -279,25 +280,25 @@ int rmdir()
     dbname(pathname);
     int ino = getino(pathname);
     MINODE * mip = iget(dev, ino);
-    if(proc->uid != mip->inode.uid && /*NOT SUPER USER*/)
+    if(proc->uid != mip->inode.i_uid && /*NOT SUPER USER*/)
     {
         printf("You do not have permission to remove %s.\n", pathname);
         return 1;
     }
-    if(!S_ISDIR(mip->inode.st_mode))
+    if(!S_ISDIR(mip->inode.i_mode))
     {
         printf("%s is not a directory", pathname);
     }
     if(mip->inode.i_links_count > 2)
     {
-        printf("Directory %s is not empty.\n" pathname);
+        printf("Directory %s is not empty.\n", pathname);
         return 1;
     }
     for(int i = 2; i < 12; i++)
     {
         if(mip->inode.i_block[i] != 0)
         {
-            printf("Directory %s is not empty.\n" pathname);
+            printf("Directory %s is not empty.\n", pathname);
             return 1;
         }
     }
@@ -305,7 +306,7 @@ int rmdir()
 
     for(int i = 0; i < 12)
     {
-        if (mip->INODE.i_block[i] == 0)
+        if (mip->inode.i_block[i] == 0)
             continue;
         bdalloc(mip->dev,mip->inode.i_block[i])
     }
@@ -328,6 +329,6 @@ int main(void)
         printf("\033[1;34mdash\033[0m $");
         fgets(line,256,stdin);
         line[strlen(line)-1] = '\0';
-        sscanf(line, "%s %s", command, pathname);
+        sscanf(line, "%s %s", cmd, pathname);
     }
 }
