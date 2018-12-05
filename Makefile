@@ -1,2 +1,5 @@
-FS360: ./src/main.c ./src/util.c ./src/level2.c ./src/type.h
-	gcc -w -g -o $@ ./src/main.c
+SRCS := $(shell find ./src -name *.c)
+HEADERS := $(shell find ./src -name *.h)
+
+FS360: $(SRCS) $(HEADERS)
+	gcc -o $@ $(SRCS)

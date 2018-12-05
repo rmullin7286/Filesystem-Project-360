@@ -1,12 +1,3 @@
-
-/*********************************************************************
-        You MAY use the util.o file to get a quick start.
- BUT you must write YOUR own util.c file in the final project
- The following are helps of how to wrtie functions in the util.c file
-*********************************************************************/
-
-
-/************** util.c file ****************/
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
@@ -14,18 +5,9 @@
 #include <string.h>
 #include <libgen.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
-extern MINODE minode[NMINODE];
-extern MINODE *root;
-extern PROC   proc[NPROC], *running;
-extern char gpath[256];
-extern char *name[64];
-extern int n;
-extern int fd, dev;
-extern int nblocks, ninodes, bmap, imap, inode_start;
-extern char line[256], cmd[32], pathname[256], pathname2[256], dname[256], bname[256];
-extern int data_start;
-extern OFT oft[NOFT];
+#include "globals.h"
 
 
 int get_block(int dev, int blk, char *buf)
@@ -48,7 +30,7 @@ int tokenize(char *pathname)
     temp = strtok(pathname, "/");
     do
         name[i++] = temp;
-    while(temp = strtok(NULL, "/") && i < 64);
+    while((temp = strtok(NULL, "/")) && i < 64);
     return i;
 }
 
@@ -270,7 +252,7 @@ void bdalloc(int dev, int bno)
     incFreeInodes(dev);
 }
 
-void truncate(MINODE * mip)
+void mytruncate(MINODE * mip)
 {
     for(int i = 0; i < 12 && mip->inode.i_block[i]; i++)
         bdalloc(mip->dev, mip->inode.i_block[i]);

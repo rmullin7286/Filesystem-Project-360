@@ -1,5 +1,13 @@
-#include "type.h"
-#include "util.c"
+#include "level2.h"
+#include <time.h>
+#include <sys/stat.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "util.h"
+#include "globals.h"
+#include "level1.h"
 
 void myopen()
 {
@@ -46,7 +54,7 @@ int open_file(char * name, int mode)
         if(oft[i].mptr == mip && oft[i].mode != R)
         {
             printf("File already open\n");
-            return;
+            return -1;
         }
 
     for(int i = 0; i < NOFT; i++)
@@ -147,19 +155,18 @@ int myread(int fd, char *buf, int nbytes)
     return count;
 }
 
-int read_file()
+void read_file()
 {
     int fd = atoi(pathname), nbytes = atoi(pathname2);
     char buf[nbytes + 1];
     if(running->fd[fd] == 0 || (running->fd[fd]->mode != R && running->fd[fd]->mode != RW))
     {
         printf("ERROR: FD %d is not open for read.\n", fd);
-        return -1;
+        return;
     }
     int ret = myread(fd, buf, nbytes);
     buf[ret] = 0;
     printf("%s", buf);
-    return ret;
 }
 
 void mytouch()
@@ -191,7 +198,7 @@ int mylseek(int fd, int position)
     return original;
 }
 
-int write_file()
+void write_file()
 {
     int fd = atoi(pathname);
     if(running->fd[fd]->refCount == 0)
@@ -248,7 +255,7 @@ int mywrite(int fd, char buf[], int nbytes)
             if(mip->inode.i_block[13] == 0)
             {
                 mip->inode.i_block[13] = balloc(mip->dev);
-                zero_block(mip->inode.i_block, mip->inode.i_block[13]);
+                zero_block(mip->inode.i_block[13], mip->inode.i_block[13]);
             }
             get_block(mip->dev, mip->inode.i_block[13], (char*)ibuf);
             if(buf[indirect1] == 0)
