@@ -13,7 +13,6 @@
 
 #include "type.h"
 
-#include "util.c"
 #include "level2.c"
 
 MINODE minode[NMINODE];
