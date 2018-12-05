@@ -121,8 +121,7 @@ int myread(int fd, char *buf, int nbytes)
         else if(lbk >= 12 && lbk < 268)
         {
             get_block(mip->dev,mip->inode.i_block[12], dbuf);
-            char *cp = dbuf;
-            blk = cp[lbk - 12];
+            blk = dbuf[lbk - 12];
         }
         else
         {
