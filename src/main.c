@@ -588,6 +588,28 @@ void mystat()
     iput(m);
 }
 
+void chmod()
+{
+    int ino = getino(pathname);
+    if(!ino)
+    {
+        printf("File does not exist\n");
+        return;
+    }
+    MINODE * m = iget(dev, ino);
+    int new;
+    sscanf(pathname2, "%o", &new);
+    
+    int old = m->inode.i_mode;
+    old >>= 9;
+    new |= (old << 9);
+
+    m->inode.i_mode = new;
+    m->dirty = 1;
+
+    iput(m);
+}
+
 int main(int argc, char * argv[])
 {
     if (argc < 2)
