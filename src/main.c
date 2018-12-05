@@ -58,17 +58,31 @@ void mount_root(char * name)  // mount root file system, establish / and CWDs
     imap = g->bg_inode_bitmap;
     inode_start = g->bg_inode_table;
 
-    root = proc[0].cwd = proc[1].cwd = iget(dev, 2);
+    root = iget(dev, 2);
+    proc[0].cwd = iget(dev, 2);
+    proc[1].cwd = iget(dev, 2);
 }
 
 //HOW TO chdir(char *pathname)
 void mychdir()
 {
     if (strlen(pathname) == 0 || strcmp(pathname, "/") == 0)
+    {
+        iput(running->cwd);
         running->cwd = root;
+        return;
+    }
     else
     {
-        int ino = getino(pathname);
+        char temp[256];
+        strcpy(temp,pathname);
+        if(pathname[0] == '/')
+        {
+            dev = root->dev;
+        }
+        else
+            dev = running->cwd->dev;
+        int ino = getino(temp);
         MINODE *mip = iget(dev, ino);
         if(!(S_ISDIR(mip->inode.i_mode)))
         {
@@ -86,11 +100,8 @@ void ls()
     int ino;
     if(strlen(pathname) == 0)
     {
+        strcpy(pathname, ".");
         ino = running->cwd->ino;
-        int pino = search(running->cwd, "..");
-        MINODE * parent = iget(dev, pino);
-        findmyname(parent, ino, pathname);
-        iput(parent);
     }
     else
     {
@@ -105,7 +116,7 @@ void ls()
     }
     else
     {
-        ls_file(ino);
+        ls_file(ino, pathname);
     }
     iput(mip);
 }
@@ -157,7 +168,10 @@ void ls_file(int ino, char *filename)
     printf(" %4d %4d %4d %4d %s %s", (int)(mip->inode.i_links_count), (int)(mip->inode.i_gid), (int)(mip->inode.i_uid), (int)(mip->inode.i_size),
             temp, filename);
 
-    printf("%s\n", (S_ISLNK(mip->inode.i_mode)) ? (char*)(mip->inode.i_block) : " ");
+    if(S_ISLNK(mip->inode.i_mode))
+        printf(" -> %s", (char*)(mip->inode.i_block));
+
+    putchar('\n');
 
     iput(mip);   
 }
@@ -168,8 +182,8 @@ void rpwd(MINODE *wd)
     if (wd==root)
         return;
     int parent_ino = search(wd,"..");
-    int my_ino = search(wd,".");
-    MINODE * pip = iget(dev, search(wd, ".."));
+    int my_ino = wd->ino;
+    MINODE * pip = iget(dev, parent_ino);
     findmyname(pip, my_ino, buf);
     rpwd(pip);
     iput(pip);
@@ -274,8 +288,12 @@ int make_entry(int dir, char * name)
     if(dir)
     {
         char buf[BLKSIZE] = {0};
-        *((DIR*)buf) = (DIR){.inode = ino, .rec_len = 12, .name_len = 1, .name = "."};
-        *((DIR*)buf +  12) = (DIR){.inode = ino, .rec_len = 12, .name_len = 2, .name = ".."};
+        char * cp = buf;
+        DIR * dp = (DIR*)buf;
+        *dp = (DIR){.inode = ino, .rec_len = 12, .name_len = 1, .name = "."};
+        cp += dp->rec_len;
+        dp = (DIR*)cp;
+        *dp = (DIR){.inode = pip->ino, .rec_len = BLKSIZE - 12, .name_len = 2, .name = ".."};
         put_block(dev, bno, buf);
     }
 
@@ -304,7 +322,7 @@ void quit()
         if (minode[i].refCount > 0 && minode[i].dirty == 1)
         {
             minode[i].refCount = 1;
-            iput(minode + i);
+            iput(&(minode[i]));
         }
     exit(0); 
 }
@@ -416,11 +434,6 @@ int rmdir()
             iput(mip);
             return 1;
         }
-    }
-    
-    if(mip->refCount > 0)
-    {
-        printf("ERROR: Directory %s is busy.\n", pathname);
     }
 
     for(int i = 0; i < 12; i++)
@@ -588,7 +601,7 @@ void mystat()
     iput(m);
 }
 
-void chmod()
+void mychmod()
 {
     int ino = getino(pathname);
     if(!ino)
@@ -614,14 +627,14 @@ int main(int argc, char * argv[])
 {
     if (argc < 2)
     {
-        printf("Usage: fs360 diskname");
+        printf("Usage: fs360 diskname\n");
         exit(1);
     }
     init();
     mount_root(argv[1]);
 
-    int (*fptr[]) () = { (int (*)())makedir, rmdir,mychdir,ls,pwd,create_file,mystat,link,symlink,unlink,quit};
-    char *cmdNames[10] = {"mkdir", "rmdir", "cd", "ls", "pwd", "creat", "stat", "link", "symlink", "unlink", "quit"};
+    int (*fptr[]) () = { (int (*)())makedir, rmdir,mychdir,ls,pwd,create_file,mystat,link,symlink,unlink, mychmod, quit};
+    char *cmdNames[12] = {"mkdir", "rmdir", "cd", "ls", "pwd", "creat", "stat", "link", "symlink", "unlink", "chmod", "quit"};
 
     while(1)
     {
@@ -633,8 +646,8 @@ int main(int argc, char * argv[])
         fgets(line,256,stdin);
         line[strlen(line)-1] = '\0';
         sscanf(line, "%s %s %s", cmd, pathname, pathname2);
-        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 10;i++);
-        if(i != 10)
+        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 12; i++);
+        if(i != 12)
         {
             fptr[i]();
         }

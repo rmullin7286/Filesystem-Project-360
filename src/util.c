@@ -15,10 +15,6 @@
 #include <libgen.h>
 #include <sys/stat.h>
 
-#include "type.h"
-
-/**** globals defined in main.c file ****/
-
 extern MINODE minode[NMINODE];
 extern MINODE *root;
 extern PROC   proc[NPROC], *running;
@@ -29,6 +25,7 @@ extern int fd, dev;
 extern int nblocks, ninodes, bmap, imap, inode_start;
 extern char line[256], cmd[32], pathname[256], pathname2[256], dname[256], bname[256];
 extern int data_start;
+
 
 int get_block(int dev, int blk, char *buf)
 {
