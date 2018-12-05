@@ -1,7 +1,7 @@
 #include "type.h"
 #include "util.c"
 
-void myopen()
+int myopen()
 {
     int ino = getino(pathname);
     int mode;
@@ -56,8 +56,9 @@ void myopen()
                 mip->inode.i_mtime = current_time;
             mip->dirty = 1;
             printf("File opened at file descriptor %d\n", i);
-            break;
+            return i;
         }
+    return -1;
 }
 
 void myclose()
@@ -268,4 +269,20 @@ int mywrite(int fd, char buf[], int nbytes)
     return original_nbytes;
 
     //TODO: OPTMIZE
+}
+
+void cp()
+{
+    int sourceino = getino(pathname), destino = getino(pathname2);
+    if(!sourceino)
+    {
+        printf("Source file does not exist\n");
+        return;
+    }
+    if(!destino)
+    {
+        printf("Dest ino does not exist\n");
+    }
+    MINODE *source = iget(dev, sourceino), *dest = iget(dev, destino);
+    
 }
