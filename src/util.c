@@ -285,3 +285,9 @@ void dbname(char *pathname)
     strcpy(temp, pathname);
     strcpy(bname, basename(temp));
 }
+
+void zero_block(int dev, int blk)
+{
+    char[BLKSIZE] buf = {0};
+    put_block(dev, blk, buf);
+}
