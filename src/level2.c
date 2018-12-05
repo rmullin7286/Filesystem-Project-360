@@ -22,7 +22,7 @@ void myopen()
 
 int open_file(char * name, int mode)
 {
-    int ino = getino(pathname);
+    int ino = getino(name);
 
     if(mode < 0 || mode > 3)
     {
@@ -165,8 +165,14 @@ int read_file()
 void mytouch()
 {
     char * pathdup = strdup(pathname);
-    int ino = getino(pathdup);
+    touch_file(pathdup);
     free(pathdup);
+}
+
+
+void touch_file(char * name)
+{
+    int ino = getino(name);
     if(!ino)
         create_file();
     else
@@ -289,13 +295,24 @@ int mywrite(int fd, char buf[], int nbytes)
 void cp()
 {
     int fdsource = open_file(pathname, R);
-    char temp[strlen(pathname2)];
+    char temp[strlen(pathname2) + 1];
     strcpy(temp, pathname2);
-    make_entry(0, temp);
+    touch_file(temp);
     int fddest = open_file(pathname2, W);
-    char buffer[running->fd[fdsource]->mptr->inode.i_size];
+    char buffer[running->fd[fdsource]->mptr->inode.i_size + 1];
     myread(fdsource, buffer, running->fd[fdsource]->mptr->inode.i_size);
+    buffer[running->fd[fdsource]->mptr->inode.i_size] = 0;
     mywrite(fddest, buffer, strlen(buffer));
     close_file(fdsource);
     close_file(fddest);
+}
+
+void mycat()
+{
+    int fd = open_file(pathname, R);
+    char buf[running->fd[fd]->mptr->inode.i_size + 1];
+    myread(fd,buf,running->fd[fd]->mptr->inode.i_size);
+    buf[running->fd[fd]->mptr->inode.i_size] = 0;
+    printf("%s", buf);
+    close_file(fd);
 }

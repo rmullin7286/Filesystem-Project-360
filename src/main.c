@@ -634,8 +634,8 @@ int main(int argc, char * argv[])
     init();
     mount_root(argv[1]);
 
-    int (*fptr[]) () = { (int (*)())makedir, rmdir,mychdir,ls,pwd,create_file,mystat,link,symlink,unlink, mychmod, myopen, read_file, write_file, myclose, quit};
-    char *cmdNames[16] = {"mkdir", "rmdir", "cd", "ls", "pwd", "creat", "stat", "link", "symlink", "unlink", "chmod", "open", "read", "write", "close", "quit"};
+    int (*fptr[]) () = { (int (*)())makedir, rmdir,mychdir,ls,pwd,create_file,mystat,link,symlink,unlink, mychmod, myopen, read_file, write_file, myclose, cp, mycat, quit};
+    char *cmdNames[18] = {"mkdir", "rmdir", "cd", "ls", "pwd", "creat", "stat", "link", "symlink", "unlink", "chmod", "open", "read", "write", "close", "cp", "cat", "quit"};
 
     while(1)
     {
@@ -647,14 +647,14 @@ int main(int argc, char * argv[])
         fgets(line,256,stdin);
         line[strlen(line)-1] = '\0';
         sscanf(line, "%s %s %s", cmd, pathname, pathname2);
-        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 16; i++);
-        if(i != 16)
+        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 18; i++);
+        if(i != 18)
         {
             fptr[i]();
         }
         else
         {
-            printf("%s is not a valid function. Use command \"help\" to see what commands are available.", cmd);
+            printf("%s is not a valid function. Use command \"help\" to see what commands are available.\n", cmd);
         }
 
     }

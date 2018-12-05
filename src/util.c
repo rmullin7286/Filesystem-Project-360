@@ -124,6 +124,7 @@ int search(MINODE *mip, char *name)
 int getino(char *pathname)
 { 
     MINODE * cur = (pathname[0] == '/') ? root : running->cwd;
+    cur->refCount++;
     // SAME as LAB6 program: just return the pathname's ino;
     int size = tokenize(pathname);
     int ino;
