@@ -226,7 +226,7 @@ int make_entry(int dir, char * name)
     MINODE * mip = iget(dev, ino);
     INODE * ip = &(mip->inode);
     time_t t = time(0L);
-    *ip = (INODE){.i_mode = (dir ? 0x41ED : 0x81A4), .i_uid = running->uid, .i_gid = running->gid, .i_size = BLKSIZE, .i_links_count = (dir ? 2 : 1),
+    *ip = (INODE){.i_mode = (dir ? 0x41ED : 0x81A4), .i_uid = running->uid, .i_gid = running->gid, .i_size = (dir ? BLKSIZE : 0), .i_links_count = (dir ? 2 : 1),
             .i_atime = t, .i_ctime = t, .i_mtime = t, .i_blocks = (dir ? 2 : 0), .i_block = {bno}};
     mip->dirty = 1;
 
@@ -332,9 +332,14 @@ int rmchild(MINODE * pip, char * name)
 void rmdir()
 {
     dbname(pathname);
-    int ino = getino(pathname); //2. Get ino of pathname
+    char *temp = strdup(pathname);
+    int ino = getino(temp); //2. Get ino of pathname
+    free(temp);
     if(!ino)
+    {
         printf("ERROR: %s does not exist.\n", pathname);
+        return;
+    }
     MINODE * mip = iget(dev, ino); //3. Get ino
     if(running->uid != mip->inode.i_uid && running->uid != 0)
     {

@@ -92,8 +92,13 @@ int main(int argc, char * argv[])
         int i;
         printf("\033[1;34mbdesh\033[0m $");
         fgets(line,256,stdin);
-        sscanf(line, "%s %s %s", cmd, pathname, pathname2);
-        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 21; i++);
+        sscanf(line, "%s %s %[^\n]s", cmd, pathname, pathname2);
+        // char * tok1 = strtok(line, " "), * tok2 = strtok(NULL, " "), * tok3 = strtok(NULL, "\n");
+        // strcpy(cmd, strtok(line," \n"));
+        // strcpy(pathname, strtok(NULL, " \n"));
+        // strcpy(pathname2, strtok(NULL, "\n"));
+
+        for(i = 0;i < 21 && (strcmp(cmd,cmdNames[i])); i++);
         if(i != 21)
         {
             fptr[i]();

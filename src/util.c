@@ -109,15 +109,19 @@ int getino(char *pathname)
     cur->refCount++;
     // SAME as LAB6 program: just return the pathname's ino;
     int size = tokenize(pathname);
+    //if pathname is a single slash, name[0] will be null
     int ino;
-    for(int i = 0; i < size; i++)
-    {
-        ino = search(cur, name[i]);
-        if(ino == 0)
-            return 0;
-        iput(cur);
-        cur = iget(cur->dev, ino);
-    }
+    if(!name[0])
+        ino = cur->ino;
+    else
+        for(int i = 0; i < size; i++)
+        {
+            ino = search(cur, name[i]);
+            if(ino == 0)
+                return 0;
+            iput(cur);
+            cur = iget(cur->dev, ino);
+        }
     iput(cur);
     return ino;
 }

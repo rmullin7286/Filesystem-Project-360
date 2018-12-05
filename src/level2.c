@@ -61,6 +61,8 @@ int open_file(char * name, int mode)
         if(oft[i].refCount == 0)
         {
             oft[i] = (OFT){.mode = mode, .refCount = 1, .mptr = mip, .offset = (mode == APPEND ? mip->inode.i_size : 0)};
+            if(mode == W)
+                mip->inode.i_size = 0;
             for(int j = 0; j < NFD; j++)
                 if(!running->fd[j])
                 {
@@ -281,6 +283,7 @@ int mywrite(int fd, char buf[], int nbytes)
         memcpy(cp, buf, remain);
         oftp->offset += remain;
         nbytes -= remain;
+        mip->inode.i_size += remain;
         put_block(mip->dev, blk, wbuf);
         if(nbytes <= 0)
             break;
@@ -326,7 +329,7 @@ void mycat()
     char buf[running->fd[fd]->mptr->inode.i_size + 1];
     myread(fd,buf,running->fd[fd]->mptr->inode.i_size);
     buf[running->fd[fd]->mptr->inode.i_size] = 0;
-    printf("%s", buf);
+    printf("%s\n", buf);
     close_file(fd);
 }
 
