@@ -26,6 +26,7 @@ int  n;
 int  fd, dev;
 int  nblocks, ninodes, bmap, imap, inode_start;
 char line[256], cmd[32], pathname[256], pathname2[256], dname[256], bname[256];
+int data_start;
 
 void init(void) // Initialize data structures of LEVEL-1:
 {
@@ -47,6 +48,7 @@ void mount_root(char * name)  // mount root file system, establish / and CWDs
         printf("NOT AN EXT2 FILESYSTEM!\n");
         exit(0);
     }
+    data_start = s->s_first_data_block;
     nblocks = s->s_blocks_count;
     ninodes = s->s_inodes_count;
 
@@ -56,7 +58,7 @@ void mount_root(char * name)  // mount root file system, establish / and CWDs
     imap = g->bg_inode_bitmap;
     inode_start = g->bg_inode_table;
 
-    proc[0].cwd = proc[1].cwd = iget(dev, 2);
+    root = proc[0].cwd = proc[1].cwd = iget(dev, 2);
 }
 
 //HOW TO chdir(char *pathname)
@@ -78,9 +80,40 @@ void mychdir()
     }
 }
 
+void ls()
+{
+    char temp[256];
+    int ino;
+    if(strlen(pathname) == 0)
+    {
+        ino = running->cwd->ino;
+        int pino = search(running->cwd, "..");
+        MINODE * parent = iget(dev, pino);
+        findmyname(parent, ino, pathname);
+        iput(parent);
+    }
+    else
+    {
+        strcpy(temp, pathname);
+        ino = getino(temp);
+    }
+    MINODE *mip = iget(dev, ino);
+
+    if(S_ISDIR(mip->inode.i_mode))
+    {
+        ls_dir(pathname);
+    }
+    else
+    {
+        ls_file(ino);
+    }
+    iput(mip);
+}
+
 void ls_dir(char * dirname)
 {
     int ino = getino(dirname);
+    puts("test");
     MINODE * mip = iget(dev, ino);
     char buf[BLKSIZE];
     for(int i = 0; i < 12 && mip->inode.i_block[i]; i++)
@@ -91,7 +124,10 @@ void ls_dir(char * dirname)
 
         while(cp < BLKSIZE + buf)
         {
-            ls_file(dp->inode);
+            char temp[256];
+            strncpy(temp, dp->name, dp->name_len);
+            temp[dp->name_len] = 0;
+            ls_file(dp->inode, temp);
             cp += dp->rec_len;
             dp = (DIR*)cp;
         }
@@ -99,7 +135,7 @@ void ls_dir(char * dirname)
     iput(mip);
 }
 
-void ls_file(int ino)
+void ls_file(int ino, char *filename)
 {
     MINODE * mip = iget(dev, ino);
     const char * t1 = "xwrxwrxwr-------";
@@ -113,16 +149,15 @@ void ls_file(int ino)
     for(int i = 8; i >= 0; i--)
         putchar(((mip->inode.i_mode) & (1 << i)) ? t1[i] : t2[i]);
 
-    printf(" %4d %4d %4d %4d %s ", mip->inode.i_links_count, mip->inode.i_gid, mip->inode.i_uid, mip->inode.i_size,
-            ctime(mip->inode.i_ctime));
+    time_t t = (time_t)(mip->inode.i_ctime);
+    char temp[256];
+    strcpy(temp, ctime(&t));
+    temp[strlen(temp)-1] = '\0';
 
-    MINODE * parent = iget(dev, search(mip, ".."));
-    char buf[256];
-    findmyname(parent, ino, buf);
-    printf("%s", basename(buf));
-    iput(parent);
+    printf(" %4d %4d %4d %4d %s %s", (int)(mip->inode.i_links_count), (int)(mip->inode.i_gid), (int)(mip->inode.i_uid), (int)(mip->inode.i_size),
+            temp, filename);
 
-    printf("%s\n" (S_ISLNK(m->inode.i_mode)) ? (char*)(m->inode.i_block) : "\0");
+    printf("%s\n", (S_ISLNK(mip->inode.i_mode)) ? (char*)(mip->inode.i_block) : " ");
 
     iput(mip);   
 }
@@ -156,7 +191,7 @@ void pwd()
 
 int ideal_length(int name_len)
 {
-    return 4 * ((11 + name_len) / 4);
+    return 4 * ((8 + name_len + 3) / 4);
 }
 
 void enter_name(MINODE * pip, int myino, char * myname)
@@ -175,6 +210,7 @@ void enter_name(MINODE * pip, int myino, char * myname)
             get_block(pip->dev, pip->inode.i_block[i], buf);
             *dp = (DIR){.inode = myino, .rec_len = BLKSIZE, .name_len = strlen(myname)};
             strncpy(dp->name, myname, dp->name_len);
+            return;
         }
  
         get_block(pip->dev, pip->inode.i_block[i], buf);
@@ -186,14 +222,17 @@ void enter_name(MINODE * pip, int myino, char * myname)
             dp = (DIR*)cp;
         }
 
-        if(dp->rec_len - ideal_length(dp->name_len) >= need_len)
+        int remain = dp->rec_len - ideal_length(dp->name_len);
+        if(remain >= need_len)
         {
             //put entry in existing block
             dp->rec_len = ideal_length(dp->name_len);
-            dp = ((DIR*)cp + dp->rec_len);
-            *dp = (DIR){.inode = myino, .rec_len = BLKSIZE - (int)(cp + dp->rec_len), .name_len = strlen(myname)};
+            cp += dp->rec_len;
+            dp = (DIR*)cp;
+            *dp = (DIR){.inode = myino, .rec_len = remain, .name_len = strlen(myname)};
             strncpy(dp->name, myname, dp->name_len);
             put_block(pip->dev, pip->inode.i_block[i], buf);
+            pip->dirty = 1;
             return;
         }
     }
@@ -298,7 +337,7 @@ int rmchild(MINODE * pip, char * name)
                 {
                     char empty[BLKSIZE] = {0};
                     put_block(dev, pip->inode.i_block, empty);
-                    bdealloc(dev, pip ->inode.i_block[i]); // Boof the entire block
+                    bdalloc(dev, pip ->inode.i_block[i]); // Boof the entire block
                     pip->inode.i_size -= BLKSIZE; // Decrement the block by the entire size of a block
                     for(int j = i; j < 11; j++)
                     {
@@ -394,7 +433,7 @@ int rmdir()
     iput(mip);
     
     MINODE * pip = iget(dev, getino(dname));
-    rm_child(pip, bname);
+    rmchild(pip, bname);
 
     pip->inode.i_links_count--;
     pip->inode.i_atime = pip->inode.i_mtime = time(0L);
@@ -436,7 +475,7 @@ void link()
     }
     enter_name(dirnode, ino, base);
 
-    source->i_links_count++;
+    source->inode.i_links_count++;
     source->dirty = 1;
 
     iput(source);
@@ -469,7 +508,7 @@ void unlink()
 
     dbname(pathname);
     MINODE * parent = iget(dev, getino(dname));
-    rm_child(parent, bname);
+    rmchild(parent, bname);
 
     iput(parent);
     iput(m);
@@ -487,8 +526,8 @@ void symlink()
     free(pathname_dup);
     int ino = make_entry(0, pathname2);
     MINODE * m = iget(dev, ino);
-    m->i_mode = 0xA1A4;
-    strcpy((char*)(m->i_block), pathname);
+    m->inode.i_mode = 0xA1A4;
+    strcpy((char*)(m->inode.i_block), pathname);
 
     iput(m);
 }
@@ -507,12 +546,12 @@ void readlink()
         printf("Specified path is not a link file\n");
         return;
     }
-    printf("%s\n" (char*)(m->inode.i_block));
+    printf("%s\n", (char*)(m->inode.i_block));
 
     iput(m);
 }
 
-void stat()
+void mystat()
 {
     int ino = getino(pathname);
     if(!ino)
@@ -532,12 +571,14 @@ void stat()
         type = "Link";
     else
         type = "Reg";
+
+    time_t a = (time_t) m->inode.i_atime, c = (time_t) m->inode.i_ctime, mod = (time_t) m->inode.i_atime;
     printf("Type: %s\n", type);
     printf("Inode: %d\n", ino);
     printf("Links: %d\n", m->inode.i_links_count);
-    printf("Access Time: %s\n", ctime(m->inode.i_atime));
-    printf("Modify Time: %s\n", ctime(m->inode.i_mtime));
-    printf("Change Time: %s\n", ctime(m->inode.i_ctime));
+    printf("Access Time: %s\n", ctime(&a));
+    printf("Modify Time: %s\n", ctime(&mod));
+    printf("Change Time: %s\n", ctime(&c));
     printf("Device: %d\n", m->dev);
     printf("UID: %d\n", m->inode.i_uid);
     printf("GID: %d\n", m->inode.i_gid);
@@ -552,16 +593,33 @@ int main(int argc, char * argv[])
     if (argc < 2)
     {
         printf("Usage: fs360 diskname");
+        exit(1);
     }
     init();
     mount_root(argv[1]);
 
+    int (*fptr[]) () = { (int (*)())makedir, rmdir,mychdir,ls,pwd,create_file,mystat,link,symlink,unlink,quit};
+    char *cmdNames[10] = {"mkdir", "rmdir", "cd", "ls", "pwd", "creat", "stat", "link", "symlink", "unlink", "quit"};
+
     while(1)
     {
+        strcpy(cmd,"");
+        strcpy(pathname,"");
+        strcpy(pathname2,"");
+        int i;
         printf("\033[1;34mbdesh\033[0m $");
         fgets(line,256,stdin);
         line[strlen(line)-1] = '\0';
         sscanf(line, "%s %s %s", cmd, pathname, pathname2);
+        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 10;i++);
+        if(i != 10)
+        {
+            fptr[i]();
+        }
+        else
+        {
+            printf("%s is not a valid function. Use command \"help\" to see what commands are available.", cmd);
+        }
 
     }
 }

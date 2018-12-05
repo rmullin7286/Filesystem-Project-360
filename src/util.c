@@ -28,6 +28,7 @@ extern int n;
 extern int fd, dev;
 extern int nblocks, ninodes, bmap, imap, inode_start;
 extern char line[256], cmd[32], pathname[256], pathname2[256], dname[256], bname[256];
+extern int data_start;
 
 int get_block(int dev, int blk, char *buf)
 {
@@ -45,7 +46,7 @@ int tokenize(char *pathname)
 {
     // tokenize pathname into n components: name[0] to name[n-1];
     char * temp;
-    int i;
+    int i = 0;
     temp = strtok(pathname, "/");
     do
         name[i++] = temp;
@@ -99,7 +100,7 @@ int search(MINODE *mip, char *name)
   char * cp;
   for (int i = 0; i < 12 && mip->inode.i_block[i]; i++)
   {
-    get_block(fd, mip->inode.i_block[i], dbuf);
+    get_block(mip->dev, mip->inode.i_block[i], dbuf);
     dp = (DIR*) dbuf;
     cp = dbuf;
 
@@ -108,7 +109,7 @@ int search(MINODE *mip, char *name)
       strncpy(temp, dp->name, dp->name_len);
       temp[dp->name_len] = 0;
       
-      if(strncmp(name,dp->name, dp->name_len) == 0)
+      if(strcmp(name,dp->name) == 0)
       {
         return dp->inode;
       }
@@ -150,7 +151,7 @@ int findmyname(MINODE *parent, u32 myino, char *myname)
     char dbuf[BLKSIZE], temp[256];
     for(int i = 0; i < 12 && parent->inode.i_block[i]; i++)
     {
-        get_block(fd, parent->inode.i_block[i], dbuf);
+        get_block(parent->dev, parent->inode.i_block[i], dbuf);
         char * cp = dbuf;
         DIR * dp = (DIR*)dbuf;
 
@@ -170,7 +171,7 @@ int findmyname(MINODE *parent, u32 myino, char *myname)
 
 int tst_bit(char * buf, int bit)
 {
-    return buf[bit] & ((bit/8) << (bit%8));
+    return buf[bit/8] & (1 << (bit%8));
 }
 
 void set_bit(char * buf, int bit)
@@ -228,6 +229,7 @@ int balloc(int dev)
     char buf[BLKSIZE];
     get_block(dev, bmap, buf);
     for(int i = 0; i < nblocks; i++)
+    {
         if(tst_bit(buf, i) == 0)
         {
             set_bit(buf, i);
@@ -235,6 +237,8 @@ int balloc(int dev)
             put_block(dev, bmap, buf);
             return i + 1;
         }
+    }
+        
     return 0;
 }
 
