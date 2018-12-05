@@ -23,6 +23,11 @@ typedef struct minode{
   struct mntable *mptr;
 }MINODE;
 
+#define R 0
+#define W 1
+#define RW 2
+#define APPEND 3
+
 typedef struct oft{
   int  mode, refCount, offset;
   MINODE *mptr;
