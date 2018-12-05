@@ -49,3 +49,19 @@ void open()
             break;
         }
 }
+
+void touch()
+{
+    char * pathdup = strdup(pathname);
+    int ino = getino(pathdup);
+    free(pathdup);
+    if(!ino)
+        create_file();
+    else
+    {
+        MINODE * mip = iget(dev, ino);
+        mip->inode.i_atime = mip->inode.i_mtime = time(0L);
+        mip->dirty = 1;
+        iput(mip);
+    }
+}
