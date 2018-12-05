@@ -1,9 +1,8 @@
 #include "type.h"
 #include "util.c"
 
-int myopen()
+void myopen()
 {
-    int ino = getino(pathname);
     int mode;
     if(strcmp(pathname2, "R") == 0)
         mode = R;
@@ -15,22 +14,32 @@ int myopen()
         mode = APPEND;
     else
         mode = -1;
+
+    int fd = open_file(pathname, mode);
+    if(fd)
+        printf("Opened file descriptor at %d\n", fd);
+}
+
+int open_file(char * name, int mode)
+{
+    int ino = getino(pathname);
+
     if(mode < 0 || mode > 3)
     {
         printf("Invalid mode\n");
-        return;
+        return -1;
     }
     if(!ino)
     {
         printf("File does not exist\n");
-        return;
+        return -1;
     }
     
     MINODE * mip = iget(dev, ino);
     if(!S_ISREG(mip->inode.i_mode))
     {
         printf("Not a regular file\n");
-        return;
+        return -1;
     }
 
     for(int i = 0; i < NOFT; i++)
@@ -55,7 +64,6 @@ int myopen()
             if(mode != R)
                 mip->inode.i_mtime = current_time;
             mip->dirty = 1;
-            printf("File opened at file descriptor %d\n", i);
             return i;
         }
     return -1;
@@ -69,6 +77,13 @@ void myclose()
         printf("ERROR: Invalid fd.\n");
         return;
     }
+
+    close_file(fd);
+}
+
+void close_file(int fd)
+{
+
 
     OFT *op = running->fd[fd];
     op->refCount--;
@@ -273,16 +288,14 @@ int mywrite(int fd, char buf[], int nbytes)
 
 void cp()
 {
-    int sourceino = getino(pathname), destino = getino(pathname2);
-    if(!sourceino)
-    {
-        printf("Source file does not exist\n");
-        return;
-    }
-    if(!destino)
-    {
-        printf("Dest ino does not exist\n");
-    }
-    MINODE *source = iget(dev, sourceino), *dest = iget(dev, destino);
-    
+    int fdsource = open_file(pathname, R);
+    char temp[strlen(pathname2)];
+    strcpy(temp, pathname2);
+    make_entry(0, temp);
+    int fddest = open_file(pathname2, W);
+    char buffer[running->fd[fdsource]->mptr->inode.i_size];
+    myread(fdsource, buffer, running->fd[fdsource]->mptr->inode.i_size);
+    mywrite(fddest, buffer, strlen(buffer));
+    close_file(fdsource);
+    close_file(fddest);
 }
