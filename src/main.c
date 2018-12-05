@@ -634,8 +634,8 @@ int main(int argc, char * argv[])
     init();
     mount_root(argv[1]);
 
-    int (*fptr[]) () = { (int (*)())makedir, rmdir,mychdir,ls,pwd,create_file,mystat,link,symlink,unlink, mychmod, quit};
-    char *cmdNames[12] = {"mkdir", "rmdir", "cd", "ls", "pwd", "creat", "stat", "link", "symlink", "unlink", "chmod", "quit"};
+    int (*fptr[]) () = { (int (*)())makedir, rmdir,mychdir,ls,pwd,create_file,mystat,link,symlink,unlink, mychmod, myopen, read_file, write_file, myclose, quit};
+    char *cmdNames[16] = {"mkdir", "rmdir", "cd", "ls", "pwd", "creat", "stat", "link", "symlink", "unlink", "chmod", "open", "read", "write", "close", "quit"};
 
     while(1)
     {
@@ -647,8 +647,8 @@ int main(int argc, char * argv[])
         fgets(line,256,stdin);
         line[strlen(line)-1] = '\0';
         sscanf(line, "%s %s %s", cmd, pathname, pathname2);
-        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 12; i++);
-        if(i != 12)
+        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 16; i++);
+        if(i != 16)
         {
             fptr[i]();
         }

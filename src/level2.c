@@ -4,7 +4,17 @@
 void myopen()
 {
     int ino = getino(pathname);
-    int mode = atoi(pathname2);
+    int mode;
+    if(strcmp(pathname2, "R") == 0)
+        mode = R;
+    else if(strcmp(pathname2, "W") == 0)
+        mode = W;
+    else if(strcmp(pathname2, "RW") == 0)
+        mode = RW;
+    else if(strcmp(pathname2, "APPEND") == 0)
+        mode = APPEND;
+    else
+        mode = -1;
     if(mode < 0 || mode > 3)
     {
         printf("Invalid mode\n");
@@ -50,9 +60,10 @@ void myopen()
         }
 }
 
-void myclose(int fd)
+void myclose()
 {
-    if(!(0<=fd<10) || running->fd[fd] == 0)
+    int fd = atoi(pathname);
+    if(!(0<=fd && fd <10) || running->fd[fd] == 0)
     {
         printf("ERROR: Invalid fd.\n");
         return;
@@ -120,18 +131,22 @@ int myread(int fd, char *buf, int nbytes)
     return count;
 }
 
-int read_file(int fd, int nbytes)
+int read_file()
 {
-    char buf[BLKSIZE];
+    int fd = atoi(pathname), nbytes = atoi(pathname2);
+    char buf[nbytes + 1];
     if(running->fd[fd] == 0 || (running->fd[fd]->mode != R && running->fd[fd]->mode != RW))
     {
         printf("ERROR: FD %d is not open for read.\n", fd);
         return -1;
     }
-    return (myread(fd, buf, nbytes));
+    int ret = myread(fd, buf, nbytes);
+    buf[ret] = 0;
+    printf("%s", buf);
+    return ret;
 }
 
-void touch()
+void mytouch()
 {
     char * pathdup = strdup(pathname);
     int ino = getino(pathdup);
@@ -173,7 +188,7 @@ int write_file()
 
 int mywrite(int fd, char buf[], int nbytes)
 {
-    int original_nbytes;
+    int original_nbytes = nbytes;
     OFT * oftp = (running->fd[fd]);
     MINODE * mip = oftp->mptr;
     char * cq = buf;

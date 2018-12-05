@@ -288,6 +288,6 @@ void dbname(char *pathname)
 
 void zero_block(int dev, int blk)
 {
-    char[BLKSIZE] buf = {0};
+    char buf[BLKSIZE] = {0};
     put_block(dev, blk, buf);
 }
