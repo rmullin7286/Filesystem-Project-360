@@ -1,7 +1,7 @@
 #include "type.h"
 #include "util.c"
 
-void open()
+void myopen()
 {
     int ino = getino(pathname);
     int mode = atoi(pathname2);
