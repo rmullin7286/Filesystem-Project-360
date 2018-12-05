@@ -24,7 +24,7 @@ void myopen()
         mode = -1;
 
     int fd = open_file(pathname, mode);
-    if(fd)
+    if(fd >= 0 && fd < 10)
         printf("Opened file descriptor at %d\n", fd);
 }
 
@@ -98,6 +98,7 @@ void close_file(int fd)
     if(op->refCount == 0)
         iput(op->mptr);
 
+    oft[fd].mptr = NULL;
     running->fd[fd] = 0;
 }
 
@@ -121,7 +122,7 @@ int myread(int fd, char *buf, int nbytes)
         {
             get_block(mip->dev,mip->inode.i_block[12], dbuf);
             char *cp = dbuf;
-            blk = cp[lbk -12];
+            blk = cp[lbk - 12];
         }
         else
         {
@@ -166,7 +167,7 @@ void read_file()
     }
     int ret = myread(fd, buf, nbytes);
     buf[ret] = 0;
-    printf("%s", buf);
+    printf("%s\n", buf);
 }
 
 void mytouch()
@@ -191,11 +192,11 @@ void touch_file(char * name)
     }
 }
 
-int mylseek(int fd, int position)
+void mylseek(int fd, int position)
 {
     int original = running->fd[fd]->offset;
     running->fd[fd]->offset = (position <= running->fd[fd]->mptr->inode.i_size && position >= 0) ? position : original;
-    return original;
+    return;
 }
 
 void write_file()

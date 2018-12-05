@@ -8,7 +8,7 @@ int myread(int fd, char * buf, int nbytes);
 void read_file();
 void mytouch();
 void touch_file(char * name);
-int mylseek(int fd, int position);
+void mylseek(int fd, int position);
 void write_file();
 int mywrite(int fd, char buf[], int nbytes);
 void cp();

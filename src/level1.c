@@ -55,7 +55,7 @@ void ls_file(int ino, char *filename)
 
     time_t t = (time_t)(mip->inode.i_ctime);
     char temp[256];
-    strcpy(temp, ctime(&t))[strlen(temp - 1)] = '\0';
+    strcpy(temp, ctime(&t))[strlen(temp) - 1] = '\0';
 
     printf(" %4d %4d %4d %4d %s %s", (int)(mip->inode.i_links_count), (int)(mip->inode.i_gid), (int)(mip->inode.i_uid), (int)(mip->inode.i_size),
             temp, filename);
@@ -142,6 +142,7 @@ void pwd()
         return;
     }
     rpwd(running->cwd);
+    putchar('\n');
     // if (wd == root) print "/"
     // else
     // rpwd(wd);
@@ -332,6 +333,8 @@ void rmdir()
 {
     dbname(pathname);
     int ino = getino(pathname); //2. Get ino of pathname
+    if(!ino)
+        printf("ERROR: %s does not exist.\n", pathname);
     MINODE * mip = iget(dev, ino); //3. Get ino
     if(running->uid != mip->inode.i_uid && running->uid != 0)
     {
