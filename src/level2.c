@@ -91,15 +91,13 @@ void myclose()
 
 void close_file(int fd)
 {
-
-
     OFT *op = running->fd[fd];
     op->refCount--;
     if(op->refCount == 0)
         iput(op->mptr);
 
     oft[fd].mptr = NULL;
-    running->fd[fd] = 0;
+    running->fd[fd] = NULL;
 }
 
 int myread(int fd, char *buf, int nbytes)
@@ -120,7 +118,7 @@ int myread(int fd, char *buf, int nbytes)
         }
         else if(lbk >= 12 && lbk < 268)
         {
-            get_block(mip->dev,mip->inode.i_block[12], dbuf);
+            get_block(mip->dev,mip->inode.i_block[12], dbuf);// Get to blocks from indirect blocks
             blk = dbuf[lbk - 12];
         }
         else
@@ -277,19 +275,27 @@ int mywrite(int fd, char buf[], int nbytes)
         get_block(mip->dev, blk, wbuf);
         char * cp = wbuf + startByte;
         int remain = BLKSIZE - startByte;
-
-        while(remain > 0)
-        {
-            *cp++ = *cq++;
-            nbytes--;
-            remain--;
-            oftp->offset++;
-            if(oftp->offset > mip->inode.i_size)
-                mip->inode.i_size++;
-            if(nbytes <= 0)
-                break;
-        }
+        memset(cp, 0, remain);
+        if(nbytes < remain)
+            remain = nbytes;
+        memcpy(cp, buf, remain);
+        oftp->offset += remain;
+        nbytes -= remain;
         put_block(mip->dev, blk, wbuf);
+        if(nbytes <= 0)
+            break;
+        // Unoptimized
+        // while(remain > 0)
+        // {
+        //     *cp++ = *cq++;
+        //     nbytes--;
+        //     remain--;
+        //     oftp->offset++;
+        //     if(oftp->offset > mip->inode.i_size)
+        //         mip->inode.i_size++;
+        //     if(nbytes <= 0)
+        //         break;
+        // }
     }
 
     mip->dirty = 1;
@@ -322,4 +328,13 @@ void mycat()
     buf[running->fd[fd]->mptr->inode.i_size] = 0;
     printf("%s", buf);
     close_file(fd);
+}
+
+void mymov()
+{
+    char * path1temp = strdup(pathname);
+    link();
+    strcpy(pathname, path1temp);
+    unlink();
+    free(path1temp);
 }

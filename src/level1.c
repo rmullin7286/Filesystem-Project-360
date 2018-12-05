@@ -403,8 +403,8 @@ void link()
         printf("Link to directory not allowed\n");
         return;
     }
-    char * dir = dirname(pathname2), * base = basename(pathname2);
-    int dirino = getino(dir);
+    dbname(pathname2);
+    int dirino = getino(dname);
     if(!dirino)
     {
         printf("Destination directory does not exist\n");
@@ -416,12 +416,14 @@ void link()
         printf("Destination is not a directory\n");
         return;
     }
+    char *base = strdup(bname);
     if(search(dirnode, base))
     {
         printf("Destination file already exists\n");
         return;
     }
-    enter_name(dirnode, ino, base);
+    free(base);
+    enter_name(dirnode, ino, bname);
 
     source->inode.i_links_count++;
     source->dirty = 1;

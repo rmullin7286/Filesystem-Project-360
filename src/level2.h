@@ -13,3 +13,4 @@ void write_file();
 int mywrite(int fd, char buf[], int nbytes);
 void cp();
 void mycat();
+void mymov();

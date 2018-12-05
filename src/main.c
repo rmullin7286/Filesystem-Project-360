@@ -83,8 +83,8 @@ int main(int argc, char * argv[])
     init();
     mount_root(argv[1]);
 
-    void (*fptr[]) () = { (void (*)())makedir, rmdir,mychdir,ls,pwd,create_file,mystat,link,symlink,unlink, mychmod, myopen, read_file, write_file, mylseek, myclose, cp, mycat, mytouch, quit};
-    char *cmdNames[20] = {"mkdir", "rmdir", "cd", "ls", "pwd", "creat", "stat", "link", "symlink", "unlink", "chmod", "open", "read", "write", "lseek", "close", "cp", "cat", "touch", "quit"};
+    void (*fptr[]) () = { (void (*)())makedir, rmdir,mychdir,ls,pwd,create_file,mystat,link,symlink,unlink, mychmod, myopen, read_file, write_file, mylseek, myclose, cp, mycat, mytouch, mymov, quit};
+    char *cmdNames[21] = {"mkdir", "rmdir", "cd", "ls", "pwd", "creat", "stat", "link", "symlink", "unlink", "chmod", "open", "read", "write", "lseek", "close", "cp", "cat", "touch", "mv", "quit"};
 
     while(1)
     {
@@ -93,8 +93,8 @@ int main(int argc, char * argv[])
         printf("\033[1;34mbdesh\033[0m $");
         fgets(line,256,stdin);
         sscanf(line, "%s %s %s", cmd, pathname, pathname2);
-        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 20; i++);
-        if(i != 20)
+        for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 21; i++);
+        if(i != 21)
         {
             fptr[i]();
         }
