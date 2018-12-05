@@ -55,8 +55,7 @@ void ls_file(int ino, char *filename)
 
     time_t t = (time_t)(mip->inode.i_ctime);
     char temp[256];
-    strcpy(temp, ctime(&t));
-    temp[strlen(temp)-1] = '\0';
+    strcpy(temp, ctime(&t))[strlen(temp - 1)] = '\0';
 
     printf(" %4d %4d %4d %4d %s %s", (int)(mip->inode.i_links_count), (int)(mip->inode.i_gid), (int)(mip->inode.i_uid), (int)(mip->inode.i_size),
             temp, filename);
@@ -259,8 +258,6 @@ void create_file()
 {
     make_entry(0, pathname);
 }
-
-
 
 int rmchild(MINODE * pip, char * name)
 {

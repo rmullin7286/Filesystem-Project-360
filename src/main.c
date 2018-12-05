@@ -4,10 +4,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 
-#include <ext2fs/ext2_fs.h>
 #include <string.h>
-#include <libgen.h>
-#include <sys/stat.h>
 #include <stdlib.h>
 
 #include "level2.h"
@@ -91,13 +88,10 @@ int main(int argc, char * argv[])
 
     while(1)
     {
-        strcpy(cmd,"");
-        strcpy(pathname,"");
-        strcpy(pathname2,"");
+        cmd[0] = pathname[0] = pathname2[0] = '\0';
         int i;
         printf("\033[1;34mbdesh\033[0m $");
         fgets(line,256,stdin);
-        line[strlen(line)-1] = '\0';
         sscanf(line, "%s %s %s", cmd, pathname, pathname2);
         for(i = 0;(strcmp(cmd,cmdNames[i])) && i < 18; i++);
         if(i != 18)
@@ -108,7 +102,6 @@ int main(int argc, char * argv[])
         {
             printf("%s is not a valid function. Use command \"help\" to see what commands are available.\n", cmd);
         }
-
     }
 }
 
