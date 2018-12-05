@@ -65,3 +65,10 @@ void touch()
         iput(mip);
     }
 }
+
+int mylseek(int fd, int position)
+{
+    int original = running->fd[fd].offset;
+    running->fd[fd].offset = (position <= running->fd[fd].mptr.inode.i_size && position >= 0) ? position : original;
+    return original;
+}
