@@ -71,7 +71,6 @@ void ls_file(int ino, char *filename)
 void ls_dir(char * dirname)
 {
     int ino = getino(dirname);
-    puts("test");
     MINODE * mip = iget(dev, ino);
     char buf[BLKSIZE];
     for(int i = 0; i < 12 && mip->inode.i_block[i]; i++)
