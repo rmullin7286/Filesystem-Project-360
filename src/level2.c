@@ -126,10 +126,10 @@ int myread(int fd, char *buf, int nbytes)
         else
         {
             get_block(mip->dev,mip->inode.i_block[13], dbuf); // Get to indirect blocks from double indirect
-            cq = dbuf + ((lbk - 268) / 256); // Find which indirect block to go to
-            get_block(mip->dev, *((int*)cq), dbuf); // Get to indirect block
-            cq = dbuf + ((lbk -268) % 256); // Go to direct block from indirect block
-            blk = *((int*)cq);// (int) *cq? Save direct block value to blk
+            //cq = dbuf + ((lbk - 268) / 256); // Find which indirect block to go to
+            get_block(mip->dev, dbuf[(lbk - 268) / 256], dbuf); // Get to indirect block
+            //cq = dbuf + ((lbk -268) % 256); // Go to direct block from indirect block
+            blk = dbuf[(lbk-268) % 256];// (int) *cq? Save direct block value to blk
         }
 
         // Get data block into readbuf
