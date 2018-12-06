@@ -107,7 +107,8 @@ int myread(int fd, char *buf, int nbytes)
     MINODE *mip = running->fd[fd]->mptr;
     OFT *op = running->fd[fd];
     int count = 0, avil = mip->inode.i_size - op->offset;
-    char *cq = buf, dbuf[BLKSIZE];
+    char *cq = buf;
+    uint32_t dbuf[256];
     int blk;
 
     while(nbytes > 0 && avil > 0)
@@ -120,14 +121,14 @@ int myread(int fd, char *buf, int nbytes)
         }
         else if(lbk >= 12 && lbk < 268)
         {
-            get_block(mip->dev,mip->inode.i_block[12], dbuf);// Get to blocks from indirect blocks
+            get_block(mip->dev,mip->inode.i_block[12], (char*)dbuf);// Get to blocks from indirect blocks
             blk = dbuf[lbk - 12];
         }
         else
         {
-            get_block(mip->dev,mip->inode.i_block[13], dbuf); // Get to indirect blocks from double indirect
+            get_block(mip->dev,mip->inode.i_block[13], (char*)dbuf); // Get to indirect blocks from double indirect
             //cq = dbuf + ((lbk - 268) / 256); // Find which indirect block to go to
-            get_block(mip->dev, dbuf[(lbk - 268) / 256], dbuf); // Get to indirect block
+            get_block(mip->dev, dbuf[(lbk - 268) / 256], (char*)dbuf); // Get to indirect block
             //cq = dbuf + ((lbk -268) % 256); // Go to direct block from indirect block
             blk = dbuf[(lbk-268) % 256];// (int) *cq? Save direct block value to blk
         }
@@ -181,7 +182,7 @@ void touch_file(char * name)
 {
     int ino = getino(name);
     if(!ino)
-        create_file();
+        make_entry(0, name);
     else
     {
         MINODE * mip = iget(dev, ino);
@@ -231,7 +232,7 @@ int mywrite(int fd, char buf[], int nbytes)
                 mip->inode.i_block[lbk] = balloc(mip->dev);
             blk = mip->inode.i_block[lbk];
         }
-        else if(lbk == 12 && lbk < 256 + 12)
+        else if(lbk >= 12 && lbk < 256 + 12)
         {
             if(mip->inode.i_block[12] == 0)
             {
@@ -239,12 +240,16 @@ int mywrite(int fd, char buf[], int nbytes)
                 zero_block(mip->dev, mip->inode.i_block[12]);
             }
             uint32_t ibuf[256];
-            get_block(mip->dev, mip->inode.i_block[12], (char*)buf);
+            get_block(mip->dev, mip->inode.i_block[12], (char*)ibuf);
             blk = ibuf[lbk - 12];
             if(blk == 0)
             {
-                blk = ibuf[lbk - 12] = balloc(mip->dev);
-                put_block(mip->dev, mip->inode.i_block[12], (char*)buf);
+                if((blk = ibuf[lbk - 12] = balloc(mip->dev)) == 0)
+                {
+                    printf("Ran out of disk space!!!!!!!!\n");
+                    return original_nbytes - nbytes;
+                }
+                put_block(mip->dev, mip->inode.i_block[12], (char*)ibuf);
             }
         }
         else
@@ -258,35 +263,37 @@ int mywrite(int fd, char buf[], int nbytes)
                 zero_block(mip->inode.i_block[13], mip->inode.i_block[13]);
             }
             get_block(mip->dev, mip->inode.i_block[13], (char*)ibuf);
-            if(buf[indirect1] == 0)
+            if(ibuf[indirect1] == 0)
             {
-                buf[indirect1] = balloc(mip->dev);
+                ibuf[indirect1] = balloc(mip->dev);
+                zero_block(mip->dev, ibuf[indirect1]);
                 put_block(mip->dev, mip->inode.i_block[13], (char*)ibuf);
             }
             uint32_t ibuf2[256];
-            get_block(mip->dev, buf[indirect1], (char*)ibuf2);
+            get_block(mip->dev, ibuf[indirect1], (char*)ibuf2);
             if(ibuf2[indirect2] == 0)
             {
                 ibuf2[indirect2] = balloc(mip->dev);
-                put_block(mip->dev, buf[indirect1], (char*)ibuf2);
+                zero_block(mip->dev, ibuf2[indirect2]);
+                put_block(mip->dev, ibuf[indirect1], (char*)ibuf2);
             }
             blk = ibuf2[indirect2];
         }
 
+        printf("%d\n", blk);
         char wbuf[BLKSIZE];
+        zero_block(mip->dev, blk);
         get_block(mip->dev, blk, wbuf);
         char * cp = wbuf + startByte;
         int remain = BLKSIZE - startByte;
-        memset(cp, 0, remain);
         if(nbytes < remain)
             remain = nbytes;
-        memcpy(cp, buf, remain);
+        memcpy(cp, cq, remain);
+        cq += remain;
         oftp->offset += remain;
         nbytes -= remain;
         mip->inode.i_size += remain;
         put_block(mip->dev, blk, wbuf);
-        if(nbytes <= 0)
-            break;
         // Unoptimized
         // while(remain > 0)
         // {
@@ -315,10 +322,11 @@ void cp()
     strcpy(temp, pathname2);
     touch_file(temp);
     int fddest = open_file(pathname2, W);
-    char buffer[running->fd[fdsource]->mptr->inode.i_size + 1];
+    char * buffer = malloc(sizeof(char) * running->fd[fdsource]->mptr->inode.i_size + 1);
     myread(fdsource, buffer, running->fd[fdsource]->mptr->inode.i_size);
     buffer[running->fd[fdsource]->mptr->inode.i_size] = 0;
-    mywrite(fddest, buffer, strlen(buffer));
+    mywrite(fddest, buffer, running->fd[fdsource]->mptr->inode.i_size);
+    free(buffer);
     close_file(fdsource);
     close_file(fddest);
 }
@@ -326,10 +334,15 @@ void cp()
 void mycat()
 {
     int fd = open_file(pathname, R);
-    char buf[running->fd[fd]->mptr->inode.i_size + 1];
+    if(fd == -1)
+    {
+        return;
+    }
+    char *buf = malloc(sizeof(char) * (running->fd[fd]->mptr->inode.i_size + 1));
     myread(fd,buf,running->fd[fd]->mptr->inode.i_size);
     buf[running->fd[fd]->mptr->inode.i_size] = 0;
     printf("%s\n", buf);
+    free(buf);
     close_file(fd);
 }
 

@@ -168,6 +168,7 @@ void enter_name(MINODE * pip, int myino, char * myname)
             get_block(pip->dev, pip->inode.i_block[i], buf);
             *dp = (DIR){.inode = myino, .rec_len = BLKSIZE, .name_len = strlen(myname)};
             strncpy(dp->name, myname, dp->name_len);
+            put_block(pip->dev, pip->inode.i_block[i], buf);
             return;
         }
  

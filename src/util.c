@@ -89,7 +89,7 @@ int search(MINODE *mip, char *name)
       strncpy(temp, dp->name, dp->name_len);
       temp[dp->name_len] = 0;
       
-      if(strcmp(name,dp->name) == 0)
+      if(strcmp(name,temp) == 0)
       {
         return dp->inode;
       }
@@ -261,7 +261,29 @@ void mytruncate(MINODE * mip)
     for(int i = 0; i < 12 && mip->inode.i_block[i]; i++)
         bdalloc(mip->dev, mip->inode.i_block[i]);
 
-    //TODO: indirect blocks
+    uint32_t buf[256];
+    if(mip->inode.i_block[12] != 0)
+    {
+        get_block(mip->dev, mip->inode.i_block[12], (char*)buf);
+        for(int i = 0; i < 256 && buf[i] != 0; i++)
+            bdalloc(mip->dev, buf[i]);
+    }
+
+    if(mip->inode.i_block[13] != 0)
+    {
+        get_block(mip->dev, mip->inode.i_block[13], (char*)buf);  
+        for(int i = 0; i < 256 && buf[i] != 0; i++)
+        {
+            uint32_t buf2[256];
+            get_block(mip->dev, buf[i], (char*)buf2);
+            for(int j = 0; j < 256 && buf2[j] != 0; j++)
+            {
+                bdalloc(mip->dev, buf2[j]);
+            }
+
+            bdalloc(mip->dev, buf[i]);
+        }
+    }
 }
 
 void dbname(char *pathname)
@@ -275,6 +297,7 @@ void dbname(char *pathname)
 
 void zero_block(int dev, int blk)
 {
-    char buf[BLKSIZE] = {0};
+    char buf[BLKSIZE];
+    memset(buf, 0, BLKSIZE);
     put_block(dev, blk, buf);
 }
