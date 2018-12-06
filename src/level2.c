@@ -280,7 +280,6 @@ int mywrite(int fd, char buf[], int nbytes)
             blk = ibuf2[indirect2];
         }
 
-        printf("%d\n", blk);
         char wbuf[BLKSIZE];
         zero_block(mip->dev, blk);
         get_block(mip->dev, blk, wbuf);
